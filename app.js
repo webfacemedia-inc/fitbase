@@ -67,6 +67,8 @@ const routes = {
   workouts: renderWorkouts,
   history: renderHistory,
   signin: renderAuth,
+  forgot: renderForgot,
+  reset: renderResetConfirm,
   session: renderSession,
 };
 
@@ -105,8 +107,72 @@ function renderAuth() {
         <div class="err" id="a-err"></div>
         <button class="btn primary" type="submit" id="a-btn">Sign in</button>
       </form>
-      <p class="alt">No account? <a href="#" onclick="return toggleAuthMode()" id="a-toggle">Create one</a></p>
+      <p class="alt">No account? <a href="#" onclick="return toggleAuthMode()" id="a-toggle">Create one</a>
+        <span style="opacity:.4"> · </span><a href="#/forgot">Forgot password?</a></p>
     </div>`;
+}
+
+function renderForgot() {
+  if (me()) { location.hash = '#/library'; return; }
+  view.innerHTML = `
+    <div class="authcard">
+      <h1>Reset password</h1>
+      <p class="sub" style="margin:6px 0 0">Enter your email and we'll send a reset link.</p>
+      <form onsubmit="return doForgot(event)">
+        <input type="email" id="fp-email" placeholder="Email" required autocomplete="email">
+        <div class="err" id="fp-msg"></div>
+        <button class="btn primary" type="submit" id="fp-btn">Send reset link</button>
+      </form>
+      <p class="alt"><a href="#/signin">← Back to sign in</a></p>
+    </div>`;
+}
+
+async function doForgot(e) {
+  e.preventDefault();
+  const email = $('#fp-email').value.trim();
+  const msg = $('#fp-msg'); const btn = $('#fp-btn');
+  msg.className = 'err'; msg.textContent = ''; btn.disabled = true;
+  try {
+    await pb.collection('users').requestPasswordReset(email);
+  } catch (_) { /* never reveal whether an address exists */ }
+  msg.className = 'err'; msg.style.color = 'var(--accent)';
+  msg.textContent = 'If that email has an account, a reset link is on its way. Check your inbox.';
+  btn.disabled = false;
+  return false;
+}
+
+function renderResetConfirm(token) {
+  if (!token) { location.hash = '#/forgot'; return; }
+  view.innerHTML = `
+    <div class="authcard">
+      <h1>Set a new password</h1>
+      <p class="sub" style="margin:6px 0 0">Choose a new password for your FitBase account.</p>
+      <form onsubmit="return doReset(event, '${esc(token)}')">
+        <input type="password" id="rp-pass" placeholder="New password" required minlength="8" autocomplete="new-password">
+        <input type="password" id="rp-pass2" placeholder="Confirm new password" required minlength="8" autocomplete="new-password">
+        <div class="err" id="rp-err"></div>
+        <button class="btn primary" type="submit" id="rp-btn">Update password</button>
+      </form>
+      <p class="alt"><a href="#/forgot">Request a new link</a></p>
+    </div>`;
+}
+
+async function doReset(e, token) {
+  e.preventDefault();
+  const p1 = $('#rp-pass').value, p2 = $('#rp-pass2').value;
+  const err = $('#rp-err'); err.textContent = '';
+  if (p1 !== p2) { err.textContent = 'Passwords do not match.'; return false; }
+  $('#rp-btn').disabled = true;
+  try {
+    await pb.collection('users').confirmPasswordReset(token, p1, p2);
+    location.hash = '#/signin';
+    toast('Password updated — sign in with your new password.');
+  } catch (err2) {
+    err.textContent = (err2?.data?.message || err2.message || 'That link is invalid or expired.')
+      + ' Request a fresh link below.';
+    $('#rp-btn').disabled = false;
+  }
+  return false;
 }
 
 let signupMode = false;

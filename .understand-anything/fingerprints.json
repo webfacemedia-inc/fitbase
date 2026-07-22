@@ -1,0 +1,449 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "b9f26242a3952a21ec08351e4b9ecff01533c56d",
+  "generatedAt": "2026-07-21T19:24:47.968Z",
+  "files": {
+    ".understand-anything/.understandignore": {
+      "filePath": ".understand-anything/.understandignore",
+      "contentHash": "61f1de0ba22830a777e0e89349ca83f90b2d52d477d1cac29f8ce29db5dd6361",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": false
+    },
+    "AGENTS.md": {
+      "filePath": "AGENTS.md",
+      "contentHash": "2c9333d96bf92610fe0c5fbf48421ab2157bc5d4c352bc662ede40a2de661d41",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 51,
+      "hasStructuralAnalysis": true
+    },
+    "app.css": {
+      "filePath": "app.css",
+      "contentHash": "f6ba1d84998b246205e4069e80827deacef5bb2ed5269de2017505d3b1472475",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 163,
+      "hasStructuralAnalysis": false
+    },
+    "app.js": {
+      "filePath": "app.js",
+      "contentHash": "7086d554a2f046dd196174fa3475fbedcdf773f754dcc0c70af52507044ceb86",
+      "functions": [
+        {
+          "name": "$",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "esc",
+          "params": [],
+          "exported": false,
+          "lineCount": 2
+        },
+        {
+          "name": "toast",
+          "params": [
+            "msg"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "modal",
+          "params": [
+            "html"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "closeModal",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "me",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "needAuth",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "loadCatalog",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "loadWorkouts",
+          "params": [
+            "force"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "route",
+          "params": [],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "renderAuthbox",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "renderAuth",
+          "params": [],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "toggleAuthMode",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "doAuth",
+          "params": [
+            "e"
+          ],
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "signOut",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "renderLibrary",
+          "params": [],
+          "exported": false,
+          "lineCount": 41
+        },
+        {
+          "name": "filtered",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "paintGrid",
+          "params": [],
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "openDetail",
+          "params": [
+            "id",
+            "lang"
+          ],
+          "exported": false,
+          "lineCount": 36
+        },
+        {
+          "name": "renderWorkouts",
+          "params": [
+            "editId"
+          ],
+          "exported": false,
+          "lineCount": 26
+        },
+        {
+          "name": "createWorkout",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "deleteWorkout",
+          "params": [
+            "id"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "renderWorkoutEditor",
+          "params": [
+            "id"
+          ],
+          "exported": false,
+          "lineCount": 32
+        },
+        {
+          "name": "getW",
+          "params": [
+            "id"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "saveItems",
+          "params": [
+            "id",
+            "items"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "updItem",
+          "params": [
+            "id",
+            "i",
+            "key",
+            "val"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "moveItem",
+          "params": [
+            "id",
+            "i",
+            "d"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "rmItem",
+          "params": [
+            "id",
+            "i"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "pickWorkout",
+          "params": [
+            "exId"
+          ],
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "addToWorkout",
+          "params": [
+            "wid",
+            "exId"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "addToNewWorkout",
+          "params": [
+            "exId"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "startSession",
+          "params": [
+            "wid"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "renderSession",
+          "params": [],
+          "exported": false,
+          "lineCount": 31
+        },
+        {
+          "name": "setVal",
+          "params": [
+            "ei",
+            "si",
+            "k",
+            "v"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "addSet",
+          "params": [
+            "ei"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "delSet",
+          "params": [
+            "ei",
+            "si"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "discardSession",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "finishSession",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "renderHistory",
+          "params": [],
+          "exported": false,
+          "lineCount": 24
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 501,
+      "hasStructuralAnalysis": true
+    },
+    "CLAUDE.md": {
+      "filePath": "CLAUDE.md",
+      "contentHash": "2c9333d96bf92610fe0c5fbf48421ab2157bc5d4c352bc662ede40a2de661d41",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 51,
+      "hasStructuralAnalysis": true
+    },
+    "docs/DESIGN.md": {
+      "filePath": "docs/DESIGN.md",
+      "contentHash": "2ddd40f3277ae3a257846c96e034d51649ad36f52d606c50f55a906f51b52436",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 32,
+      "hasStructuralAnalysis": true
+    },
+    "index.html": {
+      "filePath": "index.html",
+      "contentHash": "02827709b666d970ada15ad9acf0c297f2e67cee1871f7df6f8c784efbc39200",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 47,
+      "hasStructuralAnalysis": false
+    },
+    "pocketbase.umd.js": {
+      "filePath": "pocketbase.umd.js",
+      "contentHash": "809fb8d7ae3d7d9c2d807a8e9b456d23d3211796561974fba5772def08cc2ae8",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 3,
+      "hasStructuralAnalysis": true
+    },
+    "README.md": {
+      "filePath": "README.md",
+      "contentHash": "1526ba145ea653a412ff5a3d9aaab81f7a6bd66b37a29a95f8e5281f9a470e40",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 32,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/setup_fitbase.py": {
+      "filePath": "scripts/setup_fitbase.py",
+      "contentHash": "6ffa6e4aa09c555532d35f38df5a40905ba8ef7f1aa9740a764989b2f0e55a6d",
+      "functions": [
+        {
+          "name": "req",
+          "params": [
+            "method",
+            "path",
+            "body",
+            "token"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "ensure_collection",
+          "params": [
+            "payload"
+          ],
+          "exported": true,
+          "lineCount": 10
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "urllib.request",
+          "specifiers": [
+            "urllib.request"
+          ]
+        },
+        {
+          "source": "urllib.error",
+          "specifiers": [
+            "urllib.error"
+          ]
+        }
+      ],
+      "exports": [
+        "req",
+        "ensure_collection"
+      ],
+      "totalLines": 148,
+      "hasStructuralAnalysis": true
+    }
+  }
+}
