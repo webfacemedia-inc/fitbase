@@ -12,8 +12,9 @@ body{
 }
 a{color:var(--accent);text-decoration:none}
 button{font:inherit;cursor:pointer;border:none;border-radius:9px}
-input,select{
-  font:inherit;color:var(--text);background:var(--panel2);
+input,select,textarea{
+  /* font-size must be >=16px or iOS Safari zooms the viewport on focus */
+  font-family:inherit;font-size:16px;line-height:1.4;color:var(--text);background:var(--panel2);
   border:1px solid var(--line);border-radius:9px;padding:8px 12px;outline:none;
 }
 input:focus,select:focus{border-color:var(--accent-dim)}
