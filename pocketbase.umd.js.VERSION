@@ -1,0 +1,31 @@
+pocketbase JS SDK — vendored copy
+=================================
+
+version : 0.26.5
+file    : pocketbase.umd.js
+size    : 39071 bytes
+md5     : 2b7f59d021d818a7ec0e7abf5f144616
+source  : https://cdn.jsdelivr.net/npm/pocketbase@0.26.5/dist/pocketbase.umd.js
+
+Why this file exists
+--------------------
+The SDK is vendored (no package.json / build step here) and the UMD bundle
+carries no version string, so the copy on disk was unidentifiable — we could not
+tell which release it was, whether it was patched, or whether it needed a
+security update. The version above was recovered by checksum-matching against
+upstream releases on 2026-07-25.
+
+Keep this file next to the SDK and update BOTH together.
+
+To update
+---------
+  V=0.27.0   # check https://www.npmjs.com/package/pocketbase for latest
+  curl -fL "https://cdn.jsdelivr.net/npm/pocketbase@$V/dist/pocketbase.umd.js" -o pocketbase.umd.js
+  md5 -q pocketbase.umd.js    # (md5sum on Linux) — record it above with the new version
+
+Notes
+-----
+- The JS SDK versions independently of the PocketBase server; 0.26.x talks fine
+  to the v0.39.x servers the platform runs.
+- The same byte-identical copy is vendored in live-board, fitbase and
+  app-template. Update them together or they will drift apart.
