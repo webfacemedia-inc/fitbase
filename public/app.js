@@ -93,6 +93,9 @@ const routes = {
   workouts: renderWorkouts,
   history: renderHistory,
   gym: renderGym,
+  coach: renderCoach,
+  coaches: renderCoaches,
+  accept: renderAccept,
   signin: renderAuth,
   forgot: renderForgot,
   reset: renderResetConfirm,
@@ -220,7 +223,9 @@ async function doAuth(e) {
     }
     await pb.collection('users').authWithPassword(email, pass);
     state.workouts = null;
-    location.hash = '#/library';
+    const pending = sessionStorage.getItem('pendingInvite');
+    if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
+    else location.hash = '#/library';
     toast(signupMode ? 'Account created — welcome.' : 'Signed in.');
   } catch (err) {
     errEl.textContent = err?.data?.message || err.message || 'Failed.';
@@ -754,6 +759,158 @@ async function renderHistory() {
         </div>
       </div>`;
     }).join('') || `<p class="empty">Nothing logged yet — start a session from Workouts.</p>`}`;
+}
+
+/* ---------- coach marketplace ---------- */
+
+const money = c => '$' + (Number(c || 0) / 100).toFixed(2);
+
+async function renderCoach() {
+  if (needAuth()) return;
+  view.innerHTML = `<h1>Coach dashboard</h1><p class="sub">Loading…</p>`;
+  const [services, clients] = await Promise.all([
+    pb.collection('services').getFullList({ filter: `coach="${me().id}"`, sort: '-created' }),
+    pb.collection('memberships').getFullList({ filter: `coach="${me().id}" && status="active"`, expand: 'client' }),
+  ]);
+  view.innerHTML = `
+    <h1>Coach dashboard</h1>
+    <p class="sub">Publish services at your own rates, invite clients, and review their training.</p>
+
+    <h2 style="margin-top:8px">Your services</h2>
+    <div class="wlist" style="margin-bottom:14px">
+      ${services.map(s => `<div class="wrow">
+        <div class="grow"><div class="nm">${esc(s.title)} <span class="mt">· ${esc(s.kind)}</span></div>
+          <div class="mt">${money(s.rate)} ${s.cadence==='monthly'?'/mo':'one-off'} · ${s.active?'live':'hidden'}</div></div>
+        <button class="btn sm" onclick="toggleService('${esc(s.id)}',${!s.active})">${s.active?'Hide':'Publish'}</button>
+        <button class="btn sm danger" onclick="deleteService('${esc(s.id)}')">✕</button>
+      </div>`).join('') || `<p class="empty" style="padding:14px 0">No services yet.</p>`}
+    </div>
+    <form class="rowbar" style="flex-wrap:wrap;gap:8px" onsubmit="return createService(event)">
+      <input id="sv-title" placeholder="Service title — e.g. 12-week coaching" required style="flex:2;min-width:180px">
+      <select id="sv-kind"><option>coaching</option><option>review</option><option>nutrition</option><option>custom</option></select>
+      <input id="sv-rate" type="number" min="1" step="1" placeholder="Rate $" required style="width:90px">
+      <select id="sv-cadence"><option value="monthly">/month</option><option value="one_off">one-off</option></select>
+      <button class="btn primary" type="submit">Add service</button>
+    </form>
+
+    <h2 style="margin-top:22px">Invite a client</h2>
+    <form class="rowbar" onsubmit="return sendInvite(event)">
+      <input id="inv-email" type="email" placeholder="client@email.com" required style="flex:1">
+      <button class="btn primary" type="submit">Send invite</button>
+    </form>
+    <div class="err" id="inv-msg" style="color:var(--accent)"></div>
+
+    <h2 style="margin-top:22px">Your clients</h2>
+    <div class="wlist">
+      ${clients.map(m => {
+        const c = m.expand?.client;
+        return `<div class="wrow"><div class="grow"><div class="nm">${esc(c?.email || m.client)}</div></div>
+          <button class="btn sm" onclick="viewClient('${esc(m.client)}','${esc(c?.email || 'Client')}')">View plan</button></div>`;
+      }).join('') || `<p class="empty" style="padding:14px 0">No clients yet — send an invite above.</p>`}
+    </div>`;
+}
+
+async function createService(e) {
+  e.preventDefault();
+  try {
+    await pb.collection('services').create({
+      coach: me().id, title: $('#sv-title').value.trim(), kind: $('#sv-kind').value,
+      rate: Math.round(Number($('#sv-rate').value) * 100), cadence: $('#sv-cadence').value, active: true,
+    });
+    renderCoach();
+  } catch (err) { toast(err?.data?.message || 'Could not add service.'); }
+  return false;
+}
+async function toggleService(id, active) { await pb.collection('services').update(id, { active }); renderCoach(); }
+async function deleteService(id) { if (confirm('Delete this service?')) { await pb.collection('services').delete(id); renderCoach(); } }
+
+async function sendInvite(e) {
+  e.preventDefault();
+  const msg = $('#inv-msg'); msg.textContent = '';
+  try {
+    const r = await pb.send('/api/invite', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('#inv-email').value.trim(), role: 'client' }),
+    });
+    msg.textContent = r.emailed === false
+      ? 'Invite created. Email relay was unavailable — share this link: ' + r.link
+      : 'Invite emailed. They accept via the link to join you.';
+    $('#inv-email').value = '';
+  } catch (err) { msg.style.color = 'var(--danger)'; msg.textContent = err?.data?.message || 'Could not send invite.'; }
+  return false;
+}
+
+async function viewClient(clientId, label) {
+  let ws = [];
+  try { ws = await pb.collection('workouts').getFullList({ filter: `owner="${clientId}"`, sort: '-created' }); }
+  catch { return toast('Could not load client.'); }
+  modal(`<h2 style="text-transform:none">${esc(label)}'s plan</h2>
+    <p class="sub" style="margin:6px 0 12px">Read-only view of your client's workouts.</p>
+    <div class="wlist">
+      ${ws.map(w => `<div class="wrow"><div class="grow"><div class="nm">${esc(w.name)}</div>
+        <div class="mt">${(w.items||[]).length} exercises</div></div></div>`).join('')
+        || `<p class="empty">No workouts yet.</p>`}
+    </div>`);
+}
+
+async function renderCoaches() {
+  view.innerHTML = `<h1>Find a coach</h1><p class="sub">Loading…</p>`;
+  const services = await pb.collection('services').getFullList({ filter: 'active=true', sort: '-created', expand: 'coach' });
+  view.innerHTML = `
+    <h1>Find a coach</h1>
+    <p class="sub">Hire a coach for personalized programming, form review, or nutrition — you keep training in your own gym.</p>
+    <div class="wlist">
+      ${services.map(s => {
+        const c = s.expand?.coach;
+        return `<div class="wrow">
+          <div class="grow"><div class="nm">${esc(s.title)}</div>
+            <div class="mt">${esc(c?.name || c?.email || 'Coach')} · ${esc(s.kind)} · ${esc(s.description||'')}</div></div>
+          <div style="text-align:right"><div class="nm">${money(s.rate)}</div><div class="mt">${s.cadence==='monthly'?'/mo':'one-off'}</div></div>
+          <button class="btn sm primary" onclick="toast('Checkout arrives with billing (Phase 3).')">Hire</button>
+        </div>`;
+      }).join('') || `<p class="empty">No coaches offering services yet.</p>`}
+    </div>`;
+}
+
+async function renderAccept(token) {
+  if (!token) { location.hash = '#/library'; return; }
+  view.innerHTML = `<div class="authcard"><h1>Invite</h1><p class="sub">Loading…</p></div>`;
+  let info;
+  try { info = await pb.send('/api/invite/' + encodeURIComponent(token), { method: 'GET' }); }
+  catch { view.innerHTML = `<div class="authcard"><h1>Invite not found</h1><p class="sub">This link is invalid.</p></div>`; return; }
+  if (info.status !== 'pending') {
+    view.innerHTML = `<div class="authcard"><h1>Invite ${esc(info.status)}</h1>
+      <p class="sub">This invite is no longer usable. Ask your coach to send a new one.</p></div>`;
+    return;
+  }
+  if (!me()) {
+    view.innerHTML = `<div class="authcard">
+      <h1>${esc(info.coach)} invited you</h1>
+      <p class="sub" style="margin:6px 0 14px">Sign in or create your account to accept and join as their ${esc(info.role)}.</p>
+      <a class="btn primary" href="#/signin" onclick="sessionStorage.setItem('pendingInvite','${esc(token)}')" style="display:block;text-align:center">Sign in / Create account</a>
+    </div>`;
+    return;
+  }
+  view.innerHTML = `<div class="authcard">
+    <h1>${esc(info.coach)} invited you</h1>
+    <p class="sub" style="margin:6px 0 14px">Accept to connect as their ${esc(info.role)} — they'll be able to build and review your plan.</p>
+    <div class="err" id="acc-err"></div>
+    <button class="btn primary" id="acc-btn" style="width:100%">Accept invite</button>
+  </div>`;
+  $('#acc-btn').addEventListener('click', async () => {
+    $('#acc-btn').disabled = true;
+    try {
+      await pb.send('/api/invite/accept', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      toast('Connected with your coach.');
+      location.hash = '#/workouts';
+    } catch (err) {
+      $('#acc-err').textContent = err?.data?.message || 'Could not accept.';
+      $('#acc-btn').disabled = false;
+    }
+  });
 }
 
 /* ---------- boot ---------- */

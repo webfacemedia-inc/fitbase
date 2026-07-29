@@ -42,6 +42,11 @@ func main() {
 		// AI coach: progression suggestions from logged sessions.
 		se.Router.POST("/api/ai/progress", handleAIProgress(app)).Bind(apis.RequireAuth())
 
+		// Coach marketplace: invites (create + accept) and public invite lookup.
+		se.Router.POST("/api/invite", handleInviteCreate(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/invite/accept", handleInviteAccept(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/invite/{token}", handleInviteInfo(app))
+
 		// Smart static root: serve the SPA from pb_public with SPA fallback when
 		// index.html is present (checked per request, so a git deploy needs no
 		// restart); otherwise 302 to the admin. Identical to the stock binary so
