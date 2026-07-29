@@ -259,6 +259,11 @@ func handleAIPlan(app core.App) func(*core.RequestEvent) error {
 		}
 		equipment := jsonStrings(gp.Get("equipment"))
 		if len(equipment) == 0 {
+			// PocketBase json fields come back as types.JSONRaw ([]byte); read the
+			// serialized string and unmarshal as a fallback.
+			_ = json.Unmarshal([]byte(gp.GetString("equipment")), &equipment)
+		}
+		if len(equipment) == 0 {
 			return e.BadRequestError("Your gym has no equipment yet — add some in My Gym.", nil)
 		}
 
