@@ -89,6 +89,7 @@ async function saveGym(equipment) {
 /* ---------- router ---------- */
 
 const routes = {
+  home: renderHome,
   library: renderLibrary,
   workouts: renderWorkouts,
   history: renderHistory,
@@ -103,7 +104,7 @@ const routes = {
 };
 
 async function route() {
-  const seg = (location.hash.replace(/^#\//, '') || 'library').split('/');
+  const seg = (location.hash.replace(/^#\//, '') || (me() ? 'library' : 'home')).split('/');
   const name = routes[seg[0]] ? seg[0] : 'library';
   document.querySelectorAll('#nav a').forEach(a =>
     a.classList.toggle('active', a.dataset.route === name));
@@ -118,6 +119,7 @@ window.addEventListener('hashchange', route);
 
 function renderAuthbox() {
   const u = me();
+  const nav = $('#nav'); if (nav) nav.style.display = u ? 'flex' : 'none';
   $('#authbox').innerHTML = u
     ? `<span class="who">${esc(u.email)}</span><button class="btn sm" onclick="signOut()">Sign out</button>`
     : `<a class="btn sm primary" href="#/signin">Sign in</a>`;
@@ -911,6 +913,80 @@ async function renderAccept(token) {
       $('#acc-btn').disabled = false;
     }
   });
+}
+
+/* ---------- landing ---------- */
+
+function renderHome() {
+  if (me()) { location.hash = '#/library'; return; }
+  view.innerHTML = `
+    <section class="hero">
+      <div class="hero-inner">
+        <p class="eyebrow">Home-gym training, done right</p>
+        <h1 class="hero-h1">Your gym. Your plan.<br>A coach that actually fits your life.</h1>
+        <p class="hero-sub">FitBase turns whatever equipment you've got — a rack in the garage, a few
+          dumbbells, a building gym — into a real training plan, and adjusts it every time you lift.
+          Want a human in your corner? Hire a coach who works around your schedule.</p>
+        <div class="hero-cta">
+          <a class="btn primary lg" href="#/signin">Start training — free</a>
+          <a class="btn lg" href="#/library">Browse 1,324 exercises</a>
+        </div>
+        <p class="hero-note">Free to train. Coaching is optional. Your data stays yours.</p>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="steps3">
+        <div class="step">
+          <div class="step-n">1</div>
+          <h3>Tell us your gym</h3>
+          <p>Tick the equipment you actually have. Home rack, hotel dumbbells, or a full commercial floor —
+            FitBase only ever prescribes what you can do.</p>
+        </div>
+        <div class="step">
+          <div class="step-n">2</div>
+          <h3>Get your plan</h3>
+          <p>A weekly program built from your equipment and your goal — with a demo for every movement in
+            ten languages. New plan in seconds, not a week of back-and-forth.</p>
+        </div>
+        <div class="step">
+          <div class="step-n">3</div>
+          <h3>Log &amp; level up</h3>
+          <p>Log your sets and your plan progresses with you — the coach reads your last session and nudges
+            weight or reps so you keep moving forward.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="split">
+      <div class="split-card">
+        <h2>For lifters</h2>
+        <p>Stop guessing. Get a structured plan from the equipment in front of you, follow along with
+          real demos, and watch the numbers climb. It's free — train as long as you like.</p>
+        <a class="btn primary" href="#/signin">Create your plan</a>
+      </div>
+      <div class="split-card">
+        <h2>For coaches</h2>
+        <p>Bring your clients onto one place that already handles the programming and logging. Publish your
+          services at <b>your</b> rates — coaching, form review, nutrition — and reach home-gym lifters
+          who want a pro.</p>
+        <a class="btn" href="#/coach">Set up as a coach</a>
+      </div>
+    </section>
+
+    <section class="band statsband">
+      <div class="stats3">
+        <div><div class="stat-n">1,324</div><div class="stat-l">exercises with animated demos</div></div>
+        <div><div class="stat-n">10</div><div class="stat-l">languages, step by step</div></div>
+        <div><div class="stat-n">28</div><div class="stat-l">equipment types — home to commercial</div></div>
+      </div>
+    </section>
+
+    <section class="finalcta">
+      <h2>The gym you have is enough.</h2>
+      <p>Set it up in two minutes and train today.</p>
+      <a class="btn primary lg" href="#/signin">Start free</a>
+    </section>`;
 }
 
 /* ---------- boot ---------- */
