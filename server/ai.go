@@ -168,19 +168,23 @@ var planSchema = map[string]any{
 	},
 }
 
-func callClaudePlan(model, system, user string) (*planOut, error) {
+// callClaudeJSON calls the Messages API with a JSON-schema output constraint and
+// returns the raw JSON text of the first content block. Key stays server-side.
+func callClaudeJSON(model, system, user string, schema map[string]any) (string, error) {
 	key := os.Getenv("ANTHROPIC_API_KEY")
 	if key == "" {
-		return nil, fmt.Errorf("AI is not configured yet (no ANTHROPIC_API_KEY)")
+		return "", fmt.Errorf("AI is not configured yet (no ANTHROPIC_API_KEY)")
 	}
 	body := map[string]any{
 		"model":      model,
 		"max_tokens": 8000,
 		"system":     system,
 		"messages":   []any{map[string]any{"role": "user", "content": user}},
-		"output_config": map[string]any{
-			"format": map[string]any{"type": "json_schema", "schema": planSchema},
-		},
+	}
+	if schema != nil {
+		body["output_config"] = map[string]any{
+			"format": map[string]any{"type": "json_schema", "schema": schema},
+		}
 	}
 	buf, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(buf))
@@ -191,12 +195,12 @@ func callClaudePlan(model, system, user string) (*planOut, error) {
 	client := &http.Client{Timeout: 90 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("calling Claude: %w", err)
+		return "", fmt.Errorf("calling Claude: %w", err)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Claude API %d: %s", resp.StatusCode, tailStr(string(raw), 300))
+		return "", fmt.Errorf("Claude API %d: %s", resp.StatusCode, tailStr(string(raw), 300))
 	}
 	var out struct {
 		StopReason string `json:"stop_reason"`
@@ -206,26 +210,17 @@ func callClaudePlan(model, system, user string) (*planOut, error) {
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("decoding Claude response: %w", err)
+		return "", fmt.Errorf("decoding Claude response: %w", err)
 	}
 	if out.StopReason == "refusal" {
-		return nil, fmt.Errorf("the model declined to generate this plan")
+		return "", fmt.Errorf("the model declined this request")
 	}
-	var text string
 	for _, c := range out.Content {
-		if c.Type == "text" {
-			text = c.Text
-			break
+		if c.Type == "text" && c.Text != "" {
+			return c.Text, nil
 		}
 	}
-	if text == "" {
-		return nil, fmt.Errorf("empty plan from the model")
-	}
-	var plan planOut
-	if err := json.Unmarshal([]byte(text), &plan); err != nil {
-		return nil, fmt.Errorf("plan was not valid JSON: %w", err)
-	}
-	return &plan, nil
+	return "", fmt.Errorf("empty response from the model")
 }
 
 func tailStr(s string, n int) string {
@@ -233,6 +228,17 @@ func tailStr(s string, n int) string {
 		return s
 	}
 	return s[len(s)-n:]
+}
+
+// extractJSON returns the outermost {...} object from a possibly prose-wrapped
+// or ```json-fenced response.
+func extractJSON(s string) string {
+	i := strings.Index(s, "{")
+	j := strings.LastIndex(s, "}")
+	if i >= 0 && j > i {
+		return s[i : j+1]
+	}
+	return s
 }
 
 // ---- route handlers ----
@@ -295,9 +301,13 @@ func handleAIPlan(app core.App) func(*core.RequestEvent) error {
 				"Each item: ex_id (from the list), sets, reps, and a one-line rationale.",
 			body.Goal, body.DaysPerWeek, body.Experience, emptyDash(body.Injuries), body.SessionMinutes, b.String(), body.DaysPerWeek)
 
-		out, err := callClaudePlan(model, system, user)
+		text, err := callClaudeJSON(model, system, user, planSchema)
 		if err != nil {
 			return e.InternalServerError(err.Error(), err)
+		}
+		var out planOut
+		if err := json.Unmarshal([]byte(text), &out); err != nil {
+			return e.InternalServerError("plan was not valid JSON", err)
 		}
 
 		// validate + persist
@@ -354,6 +364,168 @@ func handleAIPlan(app core.App) func(*core.RequestEvent) error {
 			return e.InternalServerError("the model produced no usable workouts — try again", nil)
 		}
 		return e.JSON(200, map[string]any{"created": created, "model": model, "plan": plan})
+	}
+}
+
+// ---- progression ----
+
+var progressSchema = map[string]any{
+	"type":                 "object",
+	"additionalProperties": false,
+	"required":             []string{"items"},
+	"properties": map[string]any{
+		"items": map[string]any{
+			"type": "array",
+			"items": map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"required":             []string{"ex_id", "next_sets", "next_reps", "suggested_weight", "note"},
+				"properties": map[string]any{
+					"ex_id":            map[string]any{"type": "string"},
+					"next_sets":        map[string]any{"type": "integer"},
+					"next_reps":        map[string]any{"type": "integer"},
+					"suggested_weight": map[string]any{"type": "string"},
+					"note":             map[string]any{"type": "string"},
+				},
+			},
+		},
+	},
+}
+
+type progressItem struct {
+	ExID            string `json:"ex_id"`
+	NextSets        int    `json:"next_sets"`
+	NextReps        int    `json:"next_reps"`
+	SuggestedWeight string `json:"suggested_weight"`
+	Note            string `json:"note"`
+}
+
+func handleAIProgress(app core.App) func(*core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if e.Auth == nil {
+			return e.UnauthorizedError("sign in first", nil)
+		}
+		uid := e.Auth.Id
+		var body struct {
+			WorkoutID string `json:"workout_id"`
+		}
+		if err := e.BindBody(&body); err != nil || body.WorkoutID == "" {
+			return e.BadRequestError("workout_id required", nil)
+		}
+		w, err := app.FindRecordById("workouts", body.WorkoutID)
+		if err != nil || w.GetString("owner") != uid {
+			return e.NotFoundError("workout not found", nil)
+		}
+		var items []map[string]any
+		_ = json.Unmarshal([]byte(w.GetString("items")), &items)
+		if len(items) == 0 {
+			return e.BadRequestError("this workout has no exercises", nil)
+		}
+
+		// recent logged sessions, filtered to this workout in Go (relation-field
+		// filters were unreliable here; owner scope + Go match is robust).
+		all, _ := app.FindRecordsByFilter("sessions", "owner = {:o}", "-created", 40, 0, dbx.Params{"o": uid})
+		sess := []*core.Record{}
+		for _, s := range all {
+			// the sessions collection links the workout via a text field, workout_ref
+			if s.GetString("workout_ref") == body.WorkoutID {
+				sess = append(sess, s)
+			}
+			if len(sess) >= 5 {
+				break
+			}
+		}
+
+		// per-exercise logged history (most recent first)
+		hist := map[string][]string{}
+		for _, s := range sess {
+			var entries []struct {
+				ExID string `json:"ex_id"`
+				Name string `json:"name"`
+				Sets []struct {
+					Reps   any `json:"reps"`
+					Weight any `json:"weight"`
+				} `json:"sets"`
+			}
+			_ = json.Unmarshal([]byte(s.GetString("entries")), &entries)
+			for _, en := range entries {
+				parts := []string{}
+				for _, st := range en.Sets {
+					parts = append(parts, fmt.Sprintf("%v×%v", st.Reps, st.Weight))
+				}
+				if len(parts) > 0 {
+					hist[en.ExID] = append(hist[en.ExID], strings.Join(parts, ", "))
+				}
+			}
+		}
+
+		// build the prompt: current targets + logged history per exercise
+		var b strings.Builder
+		for _, it := range items {
+			ex := fmt.Sprintf("%v", it["ex_id"])
+			fmt.Fprintf(&b, "%s | %v | target %v×%v", ex, it["name"], it["sets"], it["reps"])
+			if h := hist[ex]; len(h) > 0 {
+				fmt.Fprintf(&b, " | logged (recent first): %s", strings.Join(h, "  //  "))
+			} else {
+				b.WriteString(" | no logs yet")
+			}
+			b.WriteString("\n")
+		}
+
+		model := modelForPlan(resolvePlan(e.Auth))
+		system := "You are a strength coach reviewing a client's workout and their recent logged sets " +
+			"(reps×weight). For EVERY exercise, suggest the next session's target sets/reps and a working weight, " +
+			"applying progressive overload from the current target: nudge reps or weight up when the last sets were " +
+			"completed comfortably, hold or deload if they missed reps, and when there are no logs yet keep the same " +
+			"sets/reps and suggest a sensible starting weight. Reuse each exercise's exact ex_id. Never omit an " +
+			"exercise and never leave a field empty. suggested_weight is a short human string like \"22.5 kg\", " +
+			"\"+2.5 kg\", or \"bodyweight\"."
+		exIDs := make([]string, len(items))
+		for i, it := range items {
+			exIDs[i] = fmt.Sprintf("%v", it["ex_id"])
+		}
+		user := fmt.Sprintf("Workout exercises (ex_id | name | current target | logged history):\n%s\n"+
+			"Return an items array containing EXACTLY these %d ex_ids, in this order: %s\n"+
+			"Produce one object per ex_id (no duplicates, no omissions). Each: next_sets and next_reps as positive "+
+			"integers, suggested_weight as a short non-empty string, note as one short line. "+
+			"Never leave a field empty and never use the word \"placeholder\".\n\n"+
+			"Respond with ONLY a JSON object of the form "+
+			"{\"items\":[{\"ex_id\":\"..\",\"next_sets\":N,\"next_reps\":N,\"suggested_weight\":\"..\",\"note\":\"..\"}]} "+
+			"— no markdown, no prose before or after.",
+			b.String(), len(items), strings.Join(exIDs, ", "))
+
+		// Plain JSON (no structured-output schema): on this route the schema mode
+		// degenerated to a single item; a JSON-only instruction enumerates reliably.
+		text, err := callClaudeJSON(model, system, user, nil)
+		if err != nil {
+			return e.InternalServerError(err.Error(), err)
+		}
+		var out struct {
+			Items []progressItem `json:"items"`
+		}
+		if err := json.Unmarshal([]byte(extractJSON(text)), &out); err != nil {
+			return e.InternalServerError("progression was not valid JSON", err)
+		}
+		// only return suggestions for exercises actually in the workout
+		valid := map[string]bool{}
+		for _, it := range items {
+			valid[fmt.Sprintf("%v", it["ex_id"])] = true
+		}
+		kept := out.Items[:0]
+		seen := map[string]bool{}
+		for _, s := range out.Items {
+			if valid[s.ExID] && !seen[s.ExID] {
+				seen[s.ExID] = true
+				if s.NextSets < 1 {
+					s.NextSets = 3
+				}
+				if s.NextReps < 1 {
+					s.NextReps = 10
+				}
+				kept = append(kept, s)
+			}
+		}
+		return e.JSON(200, map[string]any{"items": kept, "model": model})
 	}
 }
 

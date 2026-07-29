@@ -527,8 +527,66 @@ async function renderWorkoutEditor(id) {
     </div>
     <div class="rowbar">
       <button class="btn" onclick="location.hash='#/workouts'">← All workouts</button>
+      <button class="btn" ${items.length?'':'disabled'} onclick="suggestProgress('${esc(w.id)}')">✨ Suggest progression</button>
       <button class="btn primary" ${items.length?'':'disabled'} onclick="startSession('${esc(w.id)}')">Start session</button>
     </div>`;
+}
+
+// AI progression: suggest next-session sets/reps/weight from logged history.
+async function suggestProgress(id) {
+  const w = await getW(id);
+  const byId = Object.fromEntries((w.items || []).map(it => [it.ex_id, it]));
+  toast('Coach is reviewing your logs…');
+  let res;
+  try {
+    res = await pb.send('/api/ai/progress', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workout_id: id }),
+    });
+  } catch (err) {
+    return toast(err?.data?.message || err?.message || 'Could not get suggestions.');
+  }
+  const sugg = (res.items || []).filter(s => byId[s.ex_id]);
+  if (!sugg.length) return toast('No suggestions — log a session first, then try again.');
+  window._progress = { id, sugg };
+  modal(`
+    <h2 style="text-transform:none">Progression suggestions</h2>
+    <p class="sub" style="margin:6px 0 14px">Based on your recent logged sets. Apply to update this
+      workout's targets; the weight is a cue for your next session.</p>
+    <div class="ilist">
+      ${sugg.map(s => {
+        const it = byId[s.ex_id];
+        return `<div class="itemrow">
+          <img loading="lazy" src="${CDN}${esc(it.image)}" alt="">
+          <div class="grow">
+            <div class="nm">${esc(it.name)}</div>
+            <div class="mt">→ <b>${Number(s.next_sets)}×${Number(s.next_reps)}</b>
+              ${s.suggested_weight ? `@ ${esc(s.suggested_weight)}` : ''} · ${esc(s.note || '')}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="rowbar" style="margin-bottom:0">
+      <button class="btn" onclick="closeModal()">Not now</button>
+      <button class="btn primary" id="prog-apply">Apply to targets</button>
+    </div>`);
+  $('#prog-apply').addEventListener('click', applyProgress);
+}
+
+async function applyProgress() {
+  const { id, sugg } = window._progress || {};
+  if (!id) return;
+  $('#prog-apply').disabled = true;
+  const w = await getW(id);
+  const next = new Map(sugg.map(s => [s.ex_id, s]));
+  const items = (w.items || []).map(it => {
+    const s = next.get(it.ex_id);
+    return s ? { ...it, sets: Math.max(1, Number(s.next_sets) || it.sets), reps: Math.max(1, Number(s.next_reps) || it.reps) } : it;
+  });
+  await saveItems(id, items);
+  closeModal();
+  renderWorkoutEditor(id);
+  toast('Targets updated from your progression.');
 }
 
 async function getW(id) {
@@ -663,7 +721,7 @@ async function finishSession() {
     .filter(en => en.sets.length);
   if (!entries.length) return toast('No completed sets to save.');
   await pb.collection('sessions').create({
-    owner: me().id, workout: s.workout, workout_name: s.workout_name,
+    owner: me().id, workout_ref: s.workout, workout_name: s.workout_name,
     entries, notes: $('#s-notes').value.trim(),
   });
   state.session = null;

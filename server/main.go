@@ -39,6 +39,8 @@ func main() {
 		})
 		// AI coach: generate a weekly plan from the user's owned equipment.
 		se.Router.POST("/api/ai/plan", handleAIPlan(app)).Bind(apis.RequireAuth())
+		// AI coach: progression suggestions from logged sessions.
+		se.Router.POST("/api/ai/progress", handleAIProgress(app)).Bind(apis.RequireAuth())
 
 		// Smart static root: serve the SPA from pb_public with SPA fallback when
 		// index.html is present (checked per request, so a git deploy needs no
