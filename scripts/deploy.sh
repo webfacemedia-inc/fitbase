@@ -19,8 +19,9 @@ cd "$(dirname "$0")/.."   # repo root
 if [[ "${1:-}" != "--frontend-only" ]]; then
   echo "→ building linux/amd64 binary…"
   ( cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /tmp/fitbase-linux . )
-  scp -q /tmp/fitbase-linux "$DROPLET:$BIN"
-  ssh "$DROPLET" "chmod +x $BIN && systemctl restart wfc-fitbase && sleep 2 && systemctl is-active wfc-fitbase"
+  # scp to a temp name then mv over the running binary (can't overwrite in place)
+  scp -q /tmp/fitbase-linux "$DROPLET:$BIN.new"
+  ssh "$DROPLET" "chmod +x $BIN.new && mv -f $BIN.new $BIN && systemctl restart wfc-fitbase && sleep 2 && systemctl is-active wfc-fitbase"
   echo "→ binary shipped + service restarted"
 fi
 

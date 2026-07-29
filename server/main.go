@@ -35,8 +35,10 @@ func main() {
 		// Phase 0 probe — proves custom routes work end to end. Phase 1 adds
 		// /api/ai/plan and /api/ai/progress alongside it.
 		se.Router.GET("/api/ai/health", func(e *core.RequestEvent) error {
-			return e.JSON(200, map[string]any{"ok": true, "app": name})
+			return e.JSON(200, map[string]any{"ok": true, "app": name, "ai": os.Getenv("ANTHROPIC_API_KEY") != ""})
 		})
+		// AI coach: generate a weekly plan from the user's owned equipment.
+		se.Router.POST("/api/ai/plan", handleAIPlan(app)).Bind(apis.RequireAuth())
 
 		// Smart static root: serve the SPA from pb_public with SPA fallback when
 		// index.html is present (checked per request, so a git deploy needs no

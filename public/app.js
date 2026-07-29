@@ -401,10 +401,14 @@ async function renderWorkouts(editId) {
   const ws = await loadWorkouts();
   view.innerHTML = `
     <h1>Workouts</h1>
-    <p class="sub">Build routines from the library, then start a session to log it.</p>
+    <p class="sub">Build routines from the library, or let the AI coach build a week from your gym.</p>
     <div class="rowbar">
-      <input id="w-name" placeholder="New workout name — e.g. Push Day">
-      <button class="btn primary" onclick="createWorkout()">Create</button>
+      <button class="btn primary" onclick="openAIPlan()">✨ Generate with AI</button>
+      <span style="color:var(--muted);font-size:13px">— a weekly plan from your My&nbsp;Gym equipment</span>
+    </div>
+    <div class="rowbar">
+      <input id="w-name" placeholder="…or a manual workout name — e.g. Push Day">
+      <button class="btn" onclick="createWorkout()">Create</button>
     </div>
     <div class="wlist">
       ${ws.map(w => {
@@ -428,6 +432,63 @@ async function createWorkout() {
   const w = await pb.collection('workouts').create({ name, owner: me().id, items: [] });
   await loadWorkouts(true);
   location.hash = `#/workouts/${w.id}`;
+}
+
+/* ---------- AI plan generation ---------- */
+
+function openAIPlan() {
+  if (!me()) { location.hash = '#/signin'; return; }
+  modal(`
+    <h2 style="text-transform:none">Generate a weekly plan</h2>
+    <p class="sub" style="margin:6px 0 14px">The AI coach builds workouts from the equipment in your
+      <a href="#/gym" onclick="closeModal()">My Gym</a>. Tell it what you're training for.</p>
+    <form onsubmit="return doAIPlan(event)">
+      <div class="rowbar" style="margin:0 0 10px">
+        <input id="ai-goal" placeholder="Goal — e.g. build muscle, get stronger, lose fat" required style="flex:1">
+      </div>
+      <div class="rowbar" style="margin:0 0 10px;gap:10px">
+        <label style="flex:1;color:var(--muted);font-size:13px">Days/week
+          <select id="ai-days">${[2,3,4,5,6].map(d=>`<option ${d===3?'selected':''}>${d}</option>`).join('')}</select>
+        </label>
+        <label style="flex:1;color:var(--muted);font-size:13px">Experience
+          <select id="ai-exp"><option>beginner</option><option selected>intermediate</option><option>advanced</option></select>
+        </label>
+        <label style="flex:1;color:var(--muted);font-size:13px">Minutes/session
+          <select id="ai-min">${[30,45,60,75,90].map(m=>`<option ${m===60?'selected':''}>${m}</option>`).join('')}</select>
+        </label>
+      </div>
+      <input id="ai-inj" placeholder="Injuries / limitations (optional)" style="width:100%;margin-bottom:12px">
+      <div class="err" id="ai-err"></div>
+      <button class="btn primary" type="submit" id="ai-btn" style="width:100%">Generate my plan</button>
+    </form>`);
+}
+
+async function doAIPlan(e) {
+  e.preventDefault();
+  const btn = $('#ai-btn'), err = $('#ai-err');
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Building your plan… (up to a minute)';
+  try {
+    const res = await pb.send('/api/ai/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        goal: $('#ai-goal').value.trim(),
+        days_per_week: Number($('#ai-days').value),
+        experience: $('#ai-exp').value,
+        injuries: $('#ai-inj').value.trim(),
+        session_minutes: Number($('#ai-min').value),
+      }),
+    });
+    closeModal();
+    await loadWorkouts(true);
+    renderWorkouts();
+    const n = (res.created || []).length;
+    toast(`Created ${n} workout${n===1?'':'s'} from your gym.`);
+  } catch (err2) {
+    err.textContent = err2?.data?.message || err2?.message || 'Could not generate a plan.';
+    btn.disabled = false; btn.textContent = 'Generate my plan';
+  }
+  return false;
 }
 
 async function deleteWorkout(id) {
