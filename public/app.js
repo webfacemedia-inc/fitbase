@@ -104,7 +104,8 @@ const routes = {
 };
 
 async function route() {
-  const seg = (location.hash.replace(/^#\//, '') || (me() ? 'library' : 'home')).split('/');
+  // signed-in users land on their plan (Workouts), not the reference library
+  const seg = (location.hash.replace(/^#\//, '') || (me() ? 'workouts' : 'home')).split('/');
   const name = routes[seg[0]] ? seg[0] : 'library';
   document.querySelectorAll('#nav a').forEach(a =>
     a.classList.toggle('active', a.dataset.route === name));
