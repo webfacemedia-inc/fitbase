@@ -1,18 +1,8 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "b9f26242a3952a21ec08351e4b9ecff01533c56d",
-  "generatedAt": "2026-07-21T19:24:47.968Z",
+  "gitCommitHash": "54611754447aba8d03786da2e53dbba816d75e90",
+  "generatedAt": "2026-07-22T02:08:12.079Z",
   "files": {
-    ".understand-anything/.understandignore": {
-      "filePath": ".understand-anything/.understandignore",
-      "contentHash": "61f1de0ba22830a777e0e89349ca83f90b2d52d477d1cac29f8ce29db5dd6361",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 2,
-      "hasStructuralAnalysis": false
-    },
     "AGENTS.md": {
       "filePath": "AGENTS.md",
       "contentHash": "2c9333d96bf92610fe0c5fbf48421ab2157bc5d4c352bc662ede40a2de661d41",
@@ -25,17 +15,17 @@
     },
     "app.css": {
       "filePath": "app.css",
-      "contentHash": "f6ba1d84998b246205e4069e80827deacef5bb2ed5269de2017505d3b1472475",
+      "contentHash": "3367dd6fe7f366a712414a67c6f96ddd648a692fe1845377cb442de25c6cd6c5",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 163,
+      "totalLines": 164,
       "hasStructuralAnalysis": false
     },
     "app.js": {
       "filePath": "app.js",
-      "contentHash": "7086d554a2f046dd196174fa3475fbedcdf773f754dcc0c70af52507044ceb86",
+      "contentHash": "5d1f44dc9fed7139e8357870a83741539e66b72a92ec0c2b3da4c82ec221a4f5",
       "functions": [
         {
           "name": "$",
@@ -113,7 +103,38 @@
           "name": "renderAuth",
           "params": [],
           "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "renderForgot",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "doForgot",
+          "params": [
+            "e"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "renderResetConfirm",
+          "params": [
+            "token"
+          ],
+          "exported": false,
           "lineCount": 15
+        },
+        {
+          "name": "doReset",
+          "params": [
+            "e",
+            "token"
+          ],
+          "exported": false,
+          "lineCount": 17
         },
         {
           "name": "toggleAuthMode",
@@ -328,7 +349,7 @@
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 501,
+      "totalLines": 567,
       "hasStructuralAnalysis": true
     },
     "CLAUDE.md": {
@@ -353,12 +374,12 @@
     },
     "index.html": {
       "filePath": "index.html",
-      "contentHash": "02827709b666d970ada15ad9acf0c297f2e67cee1871f7df6f8c784efbc39200",
+      "contentHash": "a442f584152e35121460e8c5cb925e0d1f8b53c198d8a0a4ce3a161879f68f91",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 47,
+      "totalLines": 48,
       "hasStructuralAnalysis": false
     },
     "pocketbase.umd.js": {
