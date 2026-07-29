@@ -55,6 +55,9 @@ h2{font-size:16px;margin-bottom:10px}
   padding:5px 12px;border-radius:999px;font-size:12.5px;
 }
 .chip.on{color:#04120d;background:var(--accent);border-color:var(--accent);font-weight:600}
+.mygym-toggle{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;white-space:nowrap}
+.mygym-toggle input{width:auto;margin:0}
 .count{color:var(--muted);font-size:13px;margin:0 0 14px}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}

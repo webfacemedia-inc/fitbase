@@ -16,6 +16,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,
 const state = {
   catalog: null,          // light list of all exercises
   q: '', cat: '', equip: '', target: '', page: 1,
+  ownedOnly: false,       // filter library to My Gym equipment
+  gym: null,              // { record, equipment:[...] } — the user's owned equipment
   workouts: null,
   session: null,          // in-progress workout session
   detailCache: {},
@@ -60,12 +62,37 @@ async function loadWorkouts(force) {
   return state.workouts;
 }
 
+// The user's "My Gym" equipment profile (one per user). Returns the equipment
+// array (empty if none set). Cached in state.gym.
+async function loadGym(force) {
+  if (!me()) return [];
+  if (state.gym && !force) return state.gym.equipment;
+  try {
+    const rec = await pb.collection('gym_profiles').getFirstListItem(`owner="${me().id}"`);
+    state.gym = { record: rec, equipment: Array.isArray(rec.equipment) ? rec.equipment : [] };
+  } catch {
+    state.gym = { record: null, equipment: [] }; // no profile yet
+  }
+  return state.gym.equipment;
+}
+
+async function saveGym(equipment) {
+  const owner = me().id;
+  if (state.gym?.record) {
+    state.gym.record = await pb.collection('gym_profiles').update(state.gym.record.id, { equipment });
+  } else {
+    state.gym = { record: await pb.collection('gym_profiles').create({ owner, equipment }), equipment };
+  }
+  state.gym.equipment = equipment;
+}
+
 /* ---------- router ---------- */
 
 const routes = {
   library: renderLibrary,
   workouts: renderWorkouts,
   history: renderHistory,
+  gym: renderGym,
   signin: renderAuth,
   forgot: renderForgot,
   reset: renderResetConfirm,
@@ -214,9 +241,11 @@ async function renderLibrary() {
   view.innerHTML = `<h1>Exercise library</h1>
     <p class="sub">Loading the catalog…</p>`;
   const all = await loadCatalog();
+  if (me()) await loadGym();
   const cats = [...new Set(all.map(x => x.category))].sort();
   const equips = [...new Set(all.map(x => x.equipment))].sort();
   const targets = [...new Set(all.map(x => x.target))].sort();
+  const gymCount = state.gym?.equipment?.length || 0;
 
   view.innerHTML = `
     <h1>Exercise library</h1>
@@ -231,6 +260,9 @@ async function renderLibrary() {
         <option value="">All targets</option>
         ${targets.map(x => `<option ${x===state.target?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('')}
       </select>
+      ${me() ? (gymCount
+        ? `<label class="mygym-toggle"><input type="checkbox" id="f-owned" ${state.ownedOnly?'checked':''}> Only my gym (${gymCount})</label>`
+        : `<a class="btn sm" href="#/gym">Set up My Gym →</a>`) : ''}
     </div>
     <div class="chips" id="f-cats">
       <button class="chip ${state.cat===''?'on':''}" data-cat="">all</button>
@@ -243,6 +275,7 @@ async function renderLibrary() {
   $('#f-q').addEventListener('input', e => { state.q = e.target.value; state.page = 1; paintGrid(); });
   $('#f-equip').addEventListener('change', e => { state.equip = e.target.value; state.page = 1; paintGrid(); });
   $('#f-target').addEventListener('change', e => { state.target = e.target.value; state.page = 1; paintGrid(); });
+  $('#f-owned')?.addEventListener('change', e => { state.ownedOnly = e.target.checked; state.page = 1; paintGrid(); });
   $('#f-cats').addEventListener('click', e => {
     const b = e.target.closest('[data-cat]'); if (!b) return;
     state.cat = b.dataset.cat; state.page = 1;
@@ -252,13 +285,55 @@ async function renderLibrary() {
   paintGrid();
 }
 
+/* ---------- My Gym (equipment inventory) ---------- */
+
+async function renderGym() {
+  if (needAuth()) return;
+  view.innerHTML = `<h1>My Gym</h1><p class="sub">Loading…</p>`;
+  const all = await loadCatalog();
+  await loadGym();
+  const equips = [...new Set(all.map(x => x.equipment))].sort();
+  const sel = new Set(state.gym.equipment);
+  view.innerHTML = `
+    <h1>My Gym</h1>
+    <p class="sub">Tick the equipment your gym has. The library filter and your AI plans use this to
+      show only exercises you can actually do.</p>
+    <div class="chips" id="g-chips">
+      ${equips.map(x => `<button class="chip ${sel.has(x)?'on':''}" data-eq="${esc(x)}">${esc(x)}</button>`).join('')}
+    </div>
+    <div class="rowbar" style="max-width:none">
+      <span class="count" id="g-count">${sel.size} selected</span>
+      <button class="btn" onclick="location.hash='#/library'">← Library</button>
+      <button class="btn primary" id="g-save">Save my gym</button>
+    </div>`;
+  $('#g-chips').addEventListener('click', e => {
+    const b = e.target.closest('[data-eq]'); if (!b) return;
+    const eq = b.dataset.eq;
+    if (sel.has(eq)) sel.delete(eq); else sel.add(eq);
+    b.classList.toggle('on');
+    $('#g-count').textContent = `${sel.size} selected`;
+  });
+  $('#g-save').addEventListener('click', async () => {
+    const btn = $('#g-save'); btn.disabled = true;
+    try {
+      await saveGym([...sel]);
+      toast('Gym saved — used across the library and AI plans.');
+    } catch (err) {
+      toast('Could not save: ' + (err?.data?.message || err?.message || 'error'));
+    }
+    btn.disabled = false;
+  });
+}
+
 function filtered() {
   const q = state.q.trim().toLowerCase();
+  const owned = state.ownedOnly && state.gym?.equipment?.length ? new Set(state.gym.equipment) : null;
   return state.catalog.filter(x =>
     (!q || x.name.toLowerCase().includes(q) || x.target.toLowerCase().includes(q)) &&
     (!state.cat || x.category === state.cat) &&
     (!state.equip || x.equipment === state.equip) &&
-    (!state.target || x.target === state.target));
+    (!state.target || x.target === state.target) &&
+    (!owned || owned.has(x.equipment)));
 }
 
 function paintGrid() {
