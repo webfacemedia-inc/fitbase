@@ -32,6 +32,8 @@ func main() {
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		ensureSchema(app) // self-heal: coach_name on services (+ backfill)
+
 		// Phase 0 probe — proves custom routes work end to end. Phase 1 adds
 		// /api/ai/plan and /api/ai/progress alongside it.
 		se.Router.GET("/api/ai/health", func(e *core.RequestEvent) error {
@@ -46,6 +48,12 @@ func main() {
 		se.Router.POST("/api/invite", handleInviteCreate(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/invite/accept", handleInviteAccept(app)).Bind(apis.RequireAuth())
 		se.Router.GET("/api/invite/{token}", handleInviteInfo(app))
+
+		// Marketplace billing (Stripe Connect).
+		se.Router.POST("/api/billing/connect", handleBillingConnect(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/billing/status", handleBillingStatus(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/billing/hire", handleBillingHire(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/hooks/stripe", handleStripeWebhook(app)) // Stripe-signed, no auth
 
 		// Smart static root: serve the SPA from pb_public with SPA fallback when
 		// index.html is present (checked per request, so a git deploy needs no

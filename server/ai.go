@@ -301,66 +301,76 @@ func handleAIPlan(app core.App) func(*core.RequestEvent) error {
 				"Each item: ex_id (from the list), sets, reps, and a one-line rationale.",
 			body.Goal, body.DaysPerWeek, body.Experience, emptyDash(body.Injuries), body.SessionMinutes, b.String(), body.DaysPerWeek)
 
-		text, err := callClaudeJSON(model, system, user, planSchema)
-		if err != nil {
-			return e.InternalServerError(err.Error(), err)
-		}
-		var out planOut
-		if err := json.Unmarshal([]byte(text), &out); err != nil {
-			return e.InternalServerError("plan was not valid JSON", err)
-		}
-
-		// validate + persist
 		col, err := app.FindCollectionByNameOrId("workouts")
 		if err != nil {
 			return e.InternalServerError("workouts collection missing", err)
 		}
-		created := []map[string]any{}
-		for _, w := range out.Workouts {
-			items := []map[string]any{}
-			for _, it := range w.Items {
-				c, ok := validIDs[it.ExID]
-				if !ok {
-					continue // drop hallucinated ex_id
-				}
-				full, err := app.FindFirstRecordByFilter("exercises", "ex_id = {:x}", dbx.Params{"x": it.ExID})
-				if err != nil {
-					continue
-				}
-				sets := it.Sets
-				if sets < 1 {
-					sets = 3
-				}
-				reps := it.Reps
-				if reps < 1 {
-					reps = 10
-				}
-				items = append(items, map[string]any{
-					"id": full.Id, "ex_id": c.ExID, "name": c.Name, "target": c.Target,
-					"image": full.GetString("image"), "gif_url": full.GetString("gif_url"),
-					"sets": sets, "reps": reps,
-				})
-			}
-			if len(items) == 0 {
+
+		// The model occasionally returns an all-invalid (thus empty) plan — retry
+		// a couple of times before giving up. The failure path persists nothing
+		// (workouts are only saved once they have valid items), so no duplicates.
+		var created []map[string]any
+		var lastErr error
+		for attempt := 0; attempt < 3 && len(created) == 0; attempt++ {
+			text, err := callClaudeJSON(model, system, user, planSchema)
+			if err != nil {
+				lastErr = err
 				continue
 			}
-			name := strings.TrimSpace(w.Name)
-			if name == "" {
-				name = "AI Workout"
+			var out planOut
+			if err := json.Unmarshal([]byte(text), &out); err != nil {
+				lastErr = fmt.Errorf("plan was not valid JSON")
+				continue
 			}
-			if w.DayLabel != "" {
-				name = w.DayLabel + " · " + name
+			for _, w := range out.Workouts {
+				items := []map[string]any{}
+				for _, it := range w.Items {
+					c, ok := validIDs[it.ExID]
+					if !ok {
+						continue // drop hallucinated ex_id
+					}
+					full, err := app.FindFirstRecordByFilter("exercises", "ex_id = {:x}", dbx.Params{"x": it.ExID})
+					if err != nil {
+						continue
+					}
+					sets := it.Sets
+					if sets < 1 {
+						sets = 3
+					}
+					reps := it.Reps
+					if reps < 1 {
+						reps = 10
+					}
+					items = append(items, map[string]any{
+						"id": full.Id, "ex_id": c.ExID, "name": c.Name, "target": c.Target,
+						"image": full.GetString("image"), "gif_url": full.GetString("gif_url"),
+						"sets": sets, "reps": reps,
+					})
+				}
+				if len(items) == 0 {
+					continue
+				}
+				name := strings.TrimSpace(w.Name)
+				if name == "" {
+					name = "AI Workout"
+				}
+				if w.DayLabel != "" {
+					name = w.DayLabel + " · " + name
+				}
+				rec := core.NewRecord(col)
+				rec.Set("owner", uid)
+				rec.Set("name", name)
+				rec.Set("items", items)
+				if err := app.Save(rec); err != nil {
+					return e.InternalServerError("saving workout", err)
+				}
+				created = append(created, map[string]any{"id": rec.Id, "name": name, "items": len(items)})
 			}
-			rec := core.NewRecord(col)
-			rec.Set("owner", uid)
-			rec.Set("name", name)
-			rec.Set("items", items)
-			if err := app.Save(rec); err != nil {
-				return e.InternalServerError("saving workout", err)
-			}
-			created = append(created, map[string]any{"id": rec.Id, "name": name, "items": len(items)})
 		}
 		if len(created) == 0 {
+			if lastErr != nil {
+				return e.InternalServerError(lastErr.Error(), lastErr)
+			}
 			return e.InternalServerError("the model produced no usable workouts — try again", nil)
 		}
 		return e.JSON(200, map[string]any{"created": created, "model": model, "plan": plan})

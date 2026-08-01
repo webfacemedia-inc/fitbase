@@ -14,6 +14,43 @@ import (
 	"github.com/pocketbase/pocketbase/tools/mailer"
 )
 
+// ensureSchema self-heals collection shape on boot so the marketplace can show
+// a coach's display name publicly (the users collection view rule hides `name`
+// from non-owners, so the public `services` list can't expand it). We denormalize
+// a public `coach_name` onto services and backfill it. Idempotent.
+func ensureSchema(app core.App) {
+	col, err := app.FindCollectionByNameOrId("services")
+	if err != nil {
+		return
+	}
+	if col.Fields.GetByName("coach_name") == nil {
+		col.Fields.Add(&core.TextField{Name: "coach_name"})
+		if err := app.Save(col); err != nil {
+			app.Logger().Warn("ensureSchema: add coach_name failed", "err", err)
+			return
+		}
+	}
+	recs, err := app.FindAllRecords("services")
+	if err != nil {
+		return
+	}
+	for _, r := range recs {
+		if r.GetString("coach_name") != "" {
+			continue
+		}
+		u, err := app.FindRecordById("users", r.GetString("coach"))
+		if err != nil {
+			continue
+		}
+		nm := u.GetString("name")
+		if nm == "" {
+			nm = u.GetString("email")
+		}
+		r.Set("coach_name", nm)
+		_ = app.Save(r)
+	}
+}
+
 func randToken() string {
 	b := make([]byte, 20)
 	_, _ = rand.Read(b)
