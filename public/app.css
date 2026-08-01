@@ -1,7 +1,7 @@
 :root{
   --bg:#0a0c10; --panel:#11141b; --panel2:#171b24; --line:#1f2530;
   --text:#ecf0f6; --muted:#8a93a5; --accent:#2dd4a7; --accent-dim:#1a8f72;
-  --danger:#e05d5d; --radius:14px;
+  --danger:#e05d5d; --radius:14px; --pad:22px;
 }
 *{box-sizing:border-box;margin:0}
 html{scroll-behavior:smooth}
@@ -9,6 +9,7 @@ body{
   background:var(--bg); color:var(--text);
   font:15px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif;
   min-height:100vh; display:flex; flex-direction:column;
+  overflow-x:hidden; /* landing break-out sections must never cause a sideways scroll */
 }
 a{color:var(--accent);text-decoration:none}
 button{font:inherit;cursor:pointer;border:none;border-radius:9px}
@@ -28,8 +29,20 @@ input:focus,select:focus{border-color:var(--accent-dim)}
 .brand{font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
 .brand span{color:var(--accent)}
 #nav{display:flex;gap:4px;flex:1}
-#nav a{color:var(--muted);padding:6px 12px;border-radius:8px;font-size:14px}
+#nav a{color:var(--muted);padding:6px 12px;border-radius:8px;font-size:14px;
+  display:inline-flex;align-items:center;gap:7px}
+#nav a svg{width:15px;height:15px;opacity:.85}
 #nav a.active{color:var(--text);background:var(--panel2)}
+#nav a.active svg{color:var(--accent);opacity:1}
+
+/* inline SVG icons (Lucide-style, stroke=currentColor) — replaces bare emoji */
+.ico{width:1em;height:1em;stroke:currentColor;stroke-width:2;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em;flex:0 0 auto}
+.btn .ico,.btn.primary .ico{width:16px;height:16px;margin-right:7px;vertical-align:-3px}
+.field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 12px}
+.fld{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12.5px}
+.fld select{width:100%}
+@media (max-width:520px){.field-grid{grid-template-columns:1fr 1fr}}
 #authbox{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 #authbox .who{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -41,7 +54,12 @@ input:focus,select:focus{border-color:var(--accent-dim)}
 .btn.sm{padding:5px 10px;font-size:13px;border-radius:7px}
 .btn:disabled{opacity:.45;cursor:default}
 
-main{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:26px 22px 60px}
+/* Default view is a centered reading column so single-column pages (workouts,
+   history, coach, session) don't hug the left with a huge right gutter. The
+   library grid and the landing page opt into full width per-route (below). */
+main{flex:1;width:100%;max-width:768px;margin:0 auto;padding:26px var(--pad) 60px}
+body[data-route="library"] main,
+body[data-route="home"] main{max-width:1180px}
 h1{font-size:22px;letter-spacing:-.02em;margin-bottom:4px}
 h2{font-size:16px;margin-bottom:10px}
 .sub{color:var(--muted);font-size:13.5px;margin-bottom:20px}
@@ -157,30 +175,76 @@ footer{
 footer .sep{opacity:.5}
 
 @media (max-width:640px){
-  #topbar{padding:10px 14px;gap:10px;flex-wrap:wrap}
-  #nav{order:3;width:100%;justify-content:space-around}
-  main{padding:18px 14px 50px}
+  :root{--pad:14px}
+  #topbar{padding:10px var(--pad);gap:10px 12px;flex-wrap:wrap}
+  .brand{font-size:18px}
+  /* one swipeable row instead of a cramped 2-row wrap of 6 links */
+  #nav{order:3;width:100%;flex-wrap:nowrap;justify-content:flex-start;gap:2px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+    margin:0 calc(var(--pad)*-1);padding:2px var(--pad)}
+  #nav::-webkit-scrollbar{display:none}
+  #nav a{white-space:nowrap;flex:0 0 auto;padding:6px 11px}
+  #authbox{margin-left:auto}
+  #authbox .who{max-width:120px}
+  main{padding:18px var(--pad) 50px}
+  h1{font-size:20px}
   .exhead{flex-direction:column}
-  .exhead img{width:100%;height:auto;aspect-ratio:1}
+  .exhead img{width:100%;height:auto;aspect-ratio:1;max-width:280px;margin:0 auto}
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  /* modal → near-fullscreen sheet, comfortable padding, no clipped corners */
+  #overlay{padding:0;align-items:stretch}
+  .modal{max-width:none;min-height:100%;border-radius:0;padding:20px var(--pad) 40px}
+  .modal h2{font-size:18px}
+  .modal .close{top:12px;right:12px}
+  .rowbar{flex-wrap:wrap}
+  .filters input[type=search]{min-width:0}
 }
 
 /* ---------- landing ---------- */
+/* Full-bleed section backgrounds: break out of the centered `main` to the full
+   viewport width, while the inner containers below keep the content centered. */
 .hero{
-  position:relative; margin:-26px -22px 0; padding:96px 22px 88px;
-  background:linear-gradient(180deg,rgba(10,12,16,.62),rgba(10,12,16,.92)),
-    url('/og.png') center 30%/cover no-repeat;
+  position:relative; width:100vw; margin:-26px calc(50% - 50vw) 0;
+  padding:clamp(48px,7vw,80px) var(--pad) clamp(48px,7vw,72px);
+  background:radial-gradient(900px 480px at 82% -14%,rgba(45,212,167,.13),transparent 62%),var(--panel);
   border-bottom:1px solid var(--line);
 }
-.hero-inner{max-width:820px;margin:0 auto;text-align:center}
-.eyebrow{color:var(--accent);font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
-.hero-h1{font-size:clamp(30px,5vw,52px);line-height:1.08;letter-spacing:-.03em;margin-bottom:18px}
-.hero-sub{color:#c9d1de;font-size:clamp(15px,2vw,18px);line-height:1.6;max-width:640px;margin:0 auto 26px}
-.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.home-hero{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1.02fr .98fr;gap:clamp(32px,5vw,56px);align-items:center}
+.hero-copy{text-align:left;min-width:0}
+.eyebrow{color:var(--accent);font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;margin-bottom:16px;font-family:ui-monospace,Menlo,monospace}
+.hero-h1{font-size:clamp(32px,4.6vw,54px);line-height:1.04;letter-spacing:-.04em;margin-bottom:18px;text-wrap:balance}
+.hero-sub{color:#c9d1de;font-size:clamp(15px,1.5vw,18px);line-height:1.6;max-width:56ch;margin:0 0 26px}
+.hero-sub b{color:var(--text)}
+.hero-cta{display:flex;gap:12px;justify-content:flex-start;flex-wrap:wrap}
 .hero-note{color:var(--muted);font-size:13px;margin-top:16px}
 .btn.lg{padding:13px 24px;font-size:15.5px;border-radius:11px}
 
-.band{margin:0 -22px;padding:64px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+/* framed product screenshot */
+.shotframe{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--panel2);
+  box-shadow:0 34px 80px -40px rgba(0,0,0,.95)}
+.sfbar{display:flex;align-items:center;gap:7px;padding:9px 13px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.sfdot{width:10px;height:10px;border-radius:50%;background:#2b3140}
+.sfurl{margin-left:10px;font-size:11.5px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;
+  background:var(--bg);padding:3px 11px;border-radius:6px}
+.shotframe img{width:100%;display:block;background:var(--bg)}
+
+/* alternating copy/screenshot showcase rows */
+.scast{max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:clamp(28px,5vw,56px);
+  align-items:center;padding:clamp(44px,7vw,76px) 0}
+.scast + .scast{padding-top:0}
+.kicker2{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.sc-copy h2{font-size:clamp(24px,3.2vw,34px);letter-spacing:-.03em;line-height:1.1;margin:0 0 14px;text-wrap:balance}
+.sc-copy p{color:var(--muted);font-size:16px;line-height:1.62;margin:0 0 20px;max-width:52ch}
+.sc-copy p b{color:var(--text)}
+.scast.reverse .sc-media{order:-1}
+@media(max-width:860px){
+  .home-hero{grid-template-columns:1fr}
+  .hero-shot{margin-top:2px}
+  .scast{grid-template-columns:1fr;gap:24px;padding:44px 0}
+  .scast.reverse .sc-media{order:0}
+}
+
+.band{width:100vw;margin:0 calc(50% - 50vw);padding:64px var(--pad);border-bottom:1px solid var(--line);background:var(--panel)}
 .steps3{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
 .step h3{font-size:18px;margin:12px 0 8px;letter-spacing:-.01em}
 .step p{color:var(--muted);font-size:14.5px;line-height:1.6}

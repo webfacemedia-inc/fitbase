@@ -25,6 +25,20 @@ const state = {
 
 /* ---------- helpers ---------- */
 
+/* Inline SVG icons (Lucide-style, currentColor). Buildless app → no icon lib;
+   these keep the UI crisp and themeable without a dependency. */
+const ICONS = {
+  sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>',
+  trend: '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  dumbbell: '<path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  whistle: '<path d="M12 10a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M16 12h5a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H8.5"/><path d="M8.5 8 7 5"/>',
+};
+const icon = (name, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg; t.classList.remove('hidden');
@@ -103,10 +117,15 @@ const routes = {
   session: renderSession,
 };
 
+let params = new URLSearchParams();
 async function route() {
   // signed-in users land on their plan (Workouts), not the reference library
-  const seg = (location.hash.replace(/^#\//, '') || (me() ? 'workouts' : 'home')).split('/');
+  const raw = location.hash.replace(/^#\//, '') || (me() ? 'workouts' : 'home');
+  const qi = raw.indexOf('?');
+  params = new URLSearchParams(qi >= 0 ? raw.slice(qi + 1) : '');
+  const seg = (qi >= 0 ? raw.slice(0, qi) : raw).split('/');
   const name = routes[seg[0]] ? seg[0] : 'library';
+  document.body.dataset.route = name; // drives per-route layout width (see main{} in CSS)
   document.querySelectorAll('#nav a').forEach(a =>
     a.classList.toggle('active', a.dataset.route === name));
   renderAuthbox();
@@ -250,6 +269,9 @@ async function renderLibrary() {
     <p class="sub">Loading the catalog…</p>`;
   const all = await loadCatalog();
   if (me()) await loadGym();
+  // The catalog fetch is slow on first load; if the user navigated to another
+  // route while it was in flight, don't clobber that view with the library.
+  if (document.body.dataset.route !== 'library') return;
   const cats = [...new Set(all.map(x => x.category))].sort();
   const equips = [...new Set(all.map(x => x.equipment))].sort();
   const targets = [...new Set(all.map(x => x.target))].sort();
@@ -411,7 +433,7 @@ async function renderWorkouts(editId) {
     <h1>Workouts</h1>
     <p class="sub">Build routines from the library, or let the AI coach build a week from your gym.</p>
     <div class="rowbar">
-      <button class="btn primary" onclick="openAIPlan()">✨ Generate with AI</button>
+      <button class="btn primary" onclick="openAIPlan()">${icon('sparkles')}Generate with AI</button>
       <span style="color:var(--muted);font-size:13px">— a weekly plan from your My&nbsp;Gym equipment</span>
     </div>
     <div class="rowbar">
@@ -447,25 +469,25 @@ async function createWorkout() {
 function openAIPlan() {
   if (!me()) { location.hash = '#/signin'; return; }
   modal(`
-    <h2 style="text-transform:none">Generate a weekly plan</h2>
-    <p class="sub" style="margin:6px 0 14px">The AI coach builds workouts from the equipment in your
+    <h2 style="text-transform:none;display:flex;align-items:center;gap:9px">${icon('sparkles','ico')}Generate a weekly plan</h2>
+    <p class="sub" style="margin:6px 0 16px">The AI coach builds workouts from the equipment in your
       <a href="#/gym" onclick="closeModal()">My Gym</a>. Tell it what you're training for.</p>
     <form onsubmit="return doAIPlan(event)">
-      <div class="rowbar" style="margin:0 0 10px">
+      <div class="rowbar" style="margin:0 0 12px">
         <input id="ai-goal" placeholder="Goal — e.g. build muscle, get stronger, lose fat" required style="flex:1">
       </div>
-      <div class="rowbar" style="margin:0 0 10px;gap:10px">
-        <label style="flex:1;color:var(--muted);font-size:13px">Days/week
+      <div class="field-grid">
+        <label class="fld">Days/week
           <select id="ai-days">${[2,3,4,5,6].map(d=>`<option ${d===3?'selected':''}>${d}</option>`).join('')}</select>
         </label>
-        <label style="flex:1;color:var(--muted);font-size:13px">Experience
+        <label class="fld">Experience
           <select id="ai-exp"><option>beginner</option><option selected>intermediate</option><option>advanced</option></select>
         </label>
-        <label style="flex:1;color:var(--muted);font-size:13px">Minutes/session
+        <label class="fld">Minutes/session
           <select id="ai-min">${[30,45,60,75,90].map(m=>`<option ${m===60?'selected':''}>${m}</option>`).join('')}</select>
         </label>
       </div>
-      <input id="ai-inj" placeholder="Injuries / limitations (optional)" style="width:100%;margin-bottom:12px">
+      <input id="ai-inj" placeholder="Injuries / limitations (optional)" style="width:100%;margin-bottom:14px">
       <div class="err" id="ai-err"></div>
       <button class="btn primary" type="submit" id="ai-btn" style="width:100%">Generate my plan</button>
     </form>`);
@@ -535,7 +557,7 @@ async function renderWorkoutEditor(id) {
     </div>
     <div class="rowbar">
       <button class="btn" onclick="location.hash='#/workouts'">← All workouts</button>
-      <button class="btn" ${items.length?'':'disabled'} onclick="suggestProgress('${esc(w.id)}')">✨ Suggest progression</button>
+      <button class="btn" ${items.length?'':'disabled'} onclick="suggestProgress('${esc(w.id)}')">${icon('trend')}Suggest progression</button>
       <button class="btn primary" ${items.length?'':'disabled'} onclick="startSession('${esc(w.id)}')">Start session</button>
     </div>`;
 }
@@ -771,13 +793,24 @@ const money = c => '$' + (Number(c || 0) / 100).toFixed(2);
 async function renderCoach() {
   if (needAuth()) return;
   view.innerHTML = `<h1>Coach dashboard</h1><p class="sub">Loading…</p>`;
-  const [services, clients] = await Promise.all([
+  const [services, clients, pay] = await Promise.all([
     pb.collection('services').getFullList({ filter: `coach="${me().id}"`, sort: '-created' }),
     pb.collection('memberships').getFullList({ filter: `coach="${me().id}" && status="active"`, expand: 'client' }),
+    pb.send('/api/billing/status', { method: 'GET' }).catch(() => ({ onboarded: false, payouts_ready: false })),
   ]);
+  const payBanner = pay.payouts_ready
+    ? `<div class="rowbar" style="background:rgba(140,198,63,.08);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:16px">
+         <div class="grow"><div class="nm" style="color:var(--accent)">✓ Payouts active</div>
+           <div class="mt">Clients can hire your services and you get paid out directly.</div></div>
+         <button class="btn sm" onclick="setupPayouts()">Manage</button></div>`
+    : `<div class="rowbar" style="background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:16px">
+         <div class="grow"><div class="nm">${pay.onboarded ? 'Finish setting up payouts' : 'Set up payouts to get paid'}</div>
+           <div class="mt">Connect a bank account so clients can hire you. FitBase keeps a 15% platform fee.</div></div>
+         <button class="btn sm primary" onclick="setupPayouts()">${pay.onboarded ? 'Continue' : 'Set up payouts'}</button></div>`;
   view.innerHTML = `
     <h1>Coach dashboard</h1>
     <p class="sub">Publish services at your own rates, invite clients, and review their training.</p>
+    ${payBanner}
 
     <h2 style="margin-top:8px">Your services</h2>
     <div class="wlist" style="margin-bottom:14px">
@@ -817,12 +850,20 @@ async function createService(e) {
   e.preventDefault();
   try {
     await pb.collection('services').create({
-      coach: me().id, title: $('#sv-title').value.trim(), kind: $('#sv-kind').value,
+      coach: me().id, coach_name: me().name || me().email,
+      title: $('#sv-title').value.trim(), kind: $('#sv-kind').value,
       rate: Math.round(Number($('#sv-rate').value) * 100), cadence: $('#sv-cadence').value, active: true,
     });
     renderCoach();
   } catch (err) { toast(err?.data?.message || 'Could not add service.'); }
   return false;
+}
+async function setupPayouts() {
+  try {
+    const r = await pb.send('/api/billing/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (r.url) { location.href = r.url; return; }
+    toast('Could not start payout setup.');
+  } catch (err) { toast(err?.data?.message || 'Could not start payout setup.'); }
 }
 async function toggleService(id, active) { await pb.collection('services').update(id, { active }); renderCoach(); }
 async function deleteService(id) { if (confirm('Delete this service?')) { await pb.collection('services').delete(id); renderCoach(); } }
@@ -858,21 +899,35 @@ async function viewClient(clientId, label) {
 
 async function renderCoaches() {
   view.innerHTML = `<h1>Find a coach</h1><p class="sub">Loading…</p>`;
-  const services = await pb.collection('services').getFullList({ filter: 'active=true', sort: '-created', expand: 'coach' });
+  const services = await pb.collection('services').getFullList({ filter: 'active=true', sort: '-created' });
   view.innerHTML = `
     <h1>Find a coach</h1>
     <p class="sub">Hire a coach for personalized programming, form review, or nutrition — you keep training in your own gym.</p>
     <div class="wlist">
       ${services.map(s => {
-        const c = s.expand?.coach;
         return `<div class="wrow">
           <div class="grow"><div class="nm">${esc(s.title)}</div>
-            <div class="mt">${esc(c?.name || c?.email || 'Coach')} · ${esc(s.kind)} · ${esc(s.description||'')}</div></div>
+            <div class="mt">${esc(s.coach_name || 'Coach')} · ${esc(s.kind)} · ${esc(s.description||'')}</div></div>
           <div style="text-align:right"><div class="nm">${money(s.rate)}</div><div class="mt">${s.cadence==='monthly'?'/mo':'one-off'}</div></div>
-          <button class="btn sm primary" onclick="toast('Checkout arrives with billing (Phase 3).')">Hire</button>
+          <button class="btn sm primary" onclick="hireService('${esc(s.id)}',this)">Hire</button>
         </div>`;
       }).join('') || `<p class="empty">No coaches offering services yet.</p>`}
     </div>`;
+  if (params.get('hired')) toast('Payment received — your coach can now see your training. 💪');
+}
+
+async function hireService(serviceId, btn) {
+  if (!me()) { toast('Sign in to hire a coach.'); location.hash = '#/login'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await pb.send('/api/billing/hire', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service_id: serviceId }),
+    });
+    if (r.url) { location.href = r.url; return; }
+    toast('Could not start checkout.');
+  } catch (err) { toast(err?.data?.message || 'Could not start checkout.'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Hire'; }
 }
 
 async function renderAccept(token) {
@@ -920,19 +975,27 @@ async function renderAccept(token) {
 
 function renderHome() {
   if (me()) { location.hash = '#/library'; return; }
+  const shot = (src, alt) => `<div class="shotframe hero-shot">
+    <div class="sfbar"><span class="sfdot"></span><span class="sfdot"></span><span class="sfdot"></span>
+      <span class="sfurl">fitbase.webface.cloud</span></div>
+    <img loading="lazy" src="${src}" alt="${alt}"></div>`;
   view.innerHTML = `
     <section class="hero">
-      <div class="hero-inner">
-        <p class="eyebrow">Home-gym training, done right</p>
-        <h1 class="hero-h1">Your gym. Your plan.<br>A coach that actually fits your life.</h1>
-        <p class="hero-sub">FitBase turns whatever equipment you've got — a rack in the garage, a few
-          dumbbells, a building gym — into a real training plan, and adjusts it every time you lift.
-          Want a human in your corner? Hire a coach who works around your schedule.</p>
-        <div class="hero-cta">
-          <a class="btn primary lg" href="#/signin">Start training — free</a>
-          <a class="btn lg" href="#/library">Browse 1,324 exercises</a>
+      <div class="home-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Home-gym coaching, rebuilt</p>
+          <h1 class="hero-h1">Your gym. Your plan. A coach only when you want one.</h1>
+          <p class="hero-sub">FitBase turns whatever you've got — a rack in the garage, a few dumbbells,
+            a building gym — into a real weekly plan, and adjusts it every time you lift. Want eyes on your
+            form? <b>Hire a real coach at their rate</b> — no standing appointment required. You keep
+            training in your own gym.</p>
+          <div class="hero-cta">
+            <a class="btn primary lg" href="#/signin">Start training — free</a>
+            <a class="btn lg" href="#/library">Browse 1,324 exercises</a>
+          </div>
+          <p class="hero-note">Free to train. Coaching is optional. Your data stays yours.</p>
         </div>
-        <p class="hero-note">Free to train. Coaching is optional. Your data stays yours.</p>
+        ${shot('/img/home-plan.jpg', 'A weekly plan built from your equipment')}
       </div>
     </section>
 
@@ -947,15 +1010,53 @@ function renderHome() {
         <div class="step">
           <div class="step-n">2</div>
           <h3>Get your plan</h3>
-          <p>A weekly program built from your equipment and your goal — with a demo for every movement in
-            ten languages. New plan in seconds, not a week of back-and-forth.</p>
+          <p>A weekly program built from your equipment and your goal — with an animated demo for every
+            movement in ten languages. A new plan in seconds, not a week of back-and-forth.</p>
         </div>
         <div class="step">
           <div class="step-n">3</div>
           <h3>Log &amp; level up</h3>
-          <p>Log your sets and your plan progresses with you — the coach reads your last session and nudges
+          <p>Log your sets and your plan progresses with you — it reads your last session and nudges
             weight or reps so you keep moving forward.</p>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="scast">
+        <div class="sc-copy">
+          <p class="kicker2">The AI coach</p>
+          <h2>Tell it your goal. It writes the week from your gym.</h2>
+          <p>Inventory your equipment once. Ask for a plan and FitBase picks only exercises you can
+            actually do — then checks every one against the real 1,324-exercise catalog, so it
+            <b>never lists a machine you don't own</b> or an exercise that doesn't exist.</p>
+          <a class="btn primary" href="#/signin">Generate my plan</a>
+        </div>
+        <div class="sc-media">${shot('/img/home-ai.jpg', 'Generate a weekly plan')}</div>
+      </div>
+      <div class="scast reverse">
+        <div class="sc-media">${shot('/img/home-workouts.jpg', 'Your weekly split, ready to run')}</div>
+        <div class="sc-copy">
+          <p class="kicker2">Progression built in</p>
+          <h2>Log your sets. The plan levels up with you.</h2>
+          <p>Every movement has an animated demo. Finish a session and hit <b>Suggest progression</b> —
+            FitBase reads your last workout and bumps weight or reps for progressive overload, so you're
+            never guessing what comes next.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="scast">
+        <div class="sc-copy">
+          <p class="kicker2">The marketplace</p>
+          <h2>Or bring in a real coach — at their rate.</h2>
+          <p>Coaches publish services — coaching, form review, nutrition — priced one-off or monthly.
+            Hire with a card; they're paid out directly through Stripe and <b>FitBase keeps 15%</b>.
+            A coach can also invite their own clients straight in.</p>
+          <a class="btn" href="#/coaches">Find a coach</a>
+        </div>
+        <div class="sc-media">${shot('/img/home-coaches.jpg', 'Find a coach and hire by the service')}</div>
       </div>
     </section>
 
@@ -969,8 +1070,7 @@ function renderHome() {
       <div class="split-card">
         <h2>For coaches</h2>
         <p>Bring your clients onto one place that already handles the programming and logging. Publish your
-          services at <b>your</b> rates — coaching, form review, nutrition — and reach home-gym lifters
-          who want a pro.</p>
+          services at <b>your</b> rates and reach home-gym lifters who want a pro — you're paid out directly.</p>
         <a class="btn" href="#/coach">Set up as a coach</a>
       </div>
     </section>

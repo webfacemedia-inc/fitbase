@@ -3,19 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FitBase</title>
-<meta name="description" content="Exercise library, workout builder, and training log.">
-<meta property="og:title" content="FitBase">
-<meta property="og:description" content="1,324 exercises. Build your workouts. Log every set.">
+<title>FitBase — your gym, your plan, a coach when you want one</title>
+<meta name="description" content="AI training plans built from the equipment you actually own — plus real coaches when you want them. 1,324 exercises with animated demos.">
+<meta name="theme-color" content="#0a0c10">
+<meta property="og:site_name" content="FitBase">
+<meta property="og:title" content="Your gym. Your plan. A coach only when you want one.">
+<meta property="og:description" content="AI training plans built from the equipment you actually own — plus real coaches when you want them.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fitbase.webface.cloud/">
-<meta property="og:image" content="https://fitbase.webface.cloud/og.png">
-<meta property="og:image:width" content="1024">
-<meta property="og:image:height" content="576">
+<meta property="og:image" content="https://fitbase.webface.cloud/og.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FitBase — home-gym AI coaching and a coach marketplace">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="FitBase">
-<meta name="twitter:description" content="1,324 exercises. Build your workouts. Log every set.">
-<meta name="twitter:image" content="https://fitbase.webface.cloud/og.png">
+<meta name="twitter:title" content="Your gym. Your plan. A coach only when you want one.">
+<meta name="twitter:description" content="AI training plans from the equipment you own — plus real coaches when you want them.">
+<meta name="twitter:image" content="https://fitbase.webface.cloud/og.png?v=2">
 <script src="./pocketbase.umd.js"></script>
 <link rel="stylesheet" href="./app.css?v=__V__">
   <script src="https://insights.webfacemedia.com/api/script.js" data-site="fitbase" defer></script>
@@ -24,12 +27,12 @@
 <header id="topbar">
   <a class="brand" href="#/">Fit<span>Base</span></a>
   <nav id="nav">
-    <a href="#/library" data-route="library">Library</a>
-    <a href="#/workouts" data-route="workouts">Workouts</a>
-    <a href="#/history" data-route="history">History</a>
-    <a href="#/gym" data-route="gym">My Gym</a>
-    <a href="#/coaches" data-route="coaches">Find a Coach</a>
-    <a href="#/coach" data-route="coach">Coach</a>
+    <a href="#/library" data-route="library"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>Library</a>
+    <a href="#/workouts" data-route="workouts"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>Workouts</a>
+    <a href="#/history" data-route="history"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>History</a>
+    <a href="#/gym" data-route="gym"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>My Gym</a>
+    <a href="#/coaches" data-route="coaches"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Find a Coach</a>
+    <a href="#/coach" data-route="coach"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M16 12h5a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H8.5"/><path d="M8.5 8 7 5"/></svg>Coach</a>
   </nav>
   <div id="authbox"></div>
 </header>
