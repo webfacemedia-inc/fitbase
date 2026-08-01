@@ -1,0 +1,56 @@
+name: Deploy FitBase
+
+# Push-to-deploy for FitBase. It runs as a webface.cloud `custom`-template app,
+# so the platform's git webhook intentionally skips it (it can't cross-compile a
+# per-app Go binary) — this workflow is that missing CI: build the linux binary
+# and ship it via scripts/deploy.sh, the same path used locally.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+# never let two deploys race onto the droplet
+concurrency:
+  group: deploy-fitbase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # fitbase and webface-cloud must be siblings so server/go.mod's
+      # `replace webface.cloud/platform => ../../webface-cloud` resolves.
+      - name: Checkout fitbase
+        uses: actions/checkout@v4
+        with:
+          path: fitbase
+
+      - name: Checkout webface-cloud (platform — build dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: webfacemedia-inc/webface-cloud
+          ssh-key: ${{ secrets.WEBFACE_CLOUD_DEPLOY_KEY }}
+          path: webface-cloud
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: fitbase/server/go.mod
+          cache-dependency-path: fitbase/server/go.sum
+
+      - name: Configure SSH to the droplet
+        env:
+          DROPLET_SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_ed25519
+          printf '%s\n' "$DROPLET_SSH_KEY" > ~/.ssh/id_ed25519
+          ssh-keyscan -H 137.184.160.83 >> ~/.ssh/known_hosts 2>/dev/null
+
+      # Reuses the exact local deploy path: cross-compile linux/amd64, scp the
+      # binary, restart the systemd unit, then sync public/ into pb_public
+      # (cache-busting index.html with the commit sha).
+      - name: Build & deploy
+        working-directory: fitbase
+        run: bash scripts/deploy.sh
