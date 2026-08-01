@@ -1,1 +1,6 @@
 # .understandignore
+public/pocketbase.umd.js
+pocketbase.umd.js.VERSION
+server/go.sum
+
+.understand-anything/

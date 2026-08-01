@@ -1,1 +1,2037 @@
-{"version": "1.0.0", "project": {"name": "fitbase", "languages": ["css", "html", "javascript", "markdown", "python"], "frameworks": ["PocketBase"], "description": "FitBase is an exercise library, workout builder, and training log \u2014 a buildless single-page app deployed on webface.cloud (fitbase.webface.cloud) with a PocketBase backend, seeded with a 1,324-exercise MIT-licensed dataset.", "analyzedAt": "2026-07-22T02:07:45.023674Z", "gitCommitHash": "54611754447aba8d03786da2e53dbba816d75e90"}, "nodes": [{"id": "document:AGENTS.md", "type": "document", "name": "AGENTS.md", "filePath": "AGENTS.md", "summary": "Agent-facing build guide for the FitBase frontend, spelling out webface.cloud platform rules (no server code, same-origin PocketBase SDK, escape user content) and PocketBase JS SDK patterns for reads, auth, realtime, and file URLs.", "tags": ["documentation", "agent-guide", "conventions", "pocketbase", "platform"], "complexity": "simple"}, {"id": "document:CLAUDE.md", "type": "document", "name": "CLAUDE.md", "filePath": "CLAUDE.md", "summary": "Claude-specific project instructions (identical to AGENTS.md) defining the webface.cloud hard rules and PocketBase SDK usage patterns that govern how the FitBase buildless frontend must be developed.", "tags": ["documentation", "agent-guide", "conventions", "pocketbase", "platform"], "complexity": "simple"}, {"id": "document:README.md", "type": "document", "name": "README.md", "filePath": "README.md", "summary": "Project overview for FitBase describing the exercise dataset and Gym visual media licensing, the three PocketBase collections (exercises, workouts, sessions) with their fields and access rules, and the buildless static stack.", "tags": ["documentation", "entry-point", "overview", "data-model", "licensing"], "complexity": "simple"}, {"id": "file:app.css", "type": "file", "name": "app.css", "filePath": "app.css", "summary": "Complete dark-theme stylesheet for the FitBase SPA, defining CSS custom properties and layout for the top bar, exercise library grid, exercise modal, auth card, workout builder, session runner, history, toasts, and mobile responsive rules.", "tags": ["stylesheet", "css", "theming", "responsive", "ui"], "complexity": "moderate", "languageNotes": "Uses CSS custom properties for a dark palette and pins form-control font-size to 16px to prevent iOS Safari from zooming the viewport on input focus."}, {"id": "file:index.html", "type": "file", "name": "index.html", "filePath": "index.html", "summary": "Single-page HTML shell for FitBase, carrying OG/Twitter social meta and an analytics tracker script, and wiring the hash-routed nav (Library, Workouts, History), view container, and script tags for the vendored PocketBase SDK, app.css, and app.js.", "tags": ["entry-point", "html", "spa-shell", "seo", "analytics"], "complexity": "simple", "languageNotes": "Loads the vendored pocketbase.umd.js before app.js and includes a deferred external analytics tracker (insights.webfacemedia.com) keyed to data-site=fitbase."}, {"id": "file:app.js", "type": "file", "name": "app.js", "filePath": "app.js", "summary": "The entire FitBase SPA: a buildless, hash-routed client that renders the exercise library, workout builder, live training session, and history views, talking to a same-origin PocketBase backend. Includes email/password auth plus forgot-password and in-app reset-confirm flows.", "tags": ["entry-point", "spa", "hash-router", "api-handler", "component"], "complexity": "complex", "languageNotes": "Vanilla-JS single-page app with no build step; routes are dispatched from a `routes` map keyed by URL hash, and handler functions are attached to the global scope for inline onclick handlers. All DB-sourced strings are passed through an `esc()` HTML-escaper before templating."}, {"id": "document:docs/DESIGN.md", "type": "document", "name": "DESIGN.md", "filePath": "docs/DESIGN.md", "summary": "Design note (2026-07-19) capturing FitBase's scope, key product/architecture decisions, and the PocketBase collection layout backing the app.", "tags": ["documentation", "design", "architecture"], "complexity": "simple"}, {"id": "file:pocketbase.umd.js", "type": "file", "name": "pocketbase.umd.js", "filePath": "pocketbase.umd.js", "summary": "Vendored, minified PocketBase JavaScript SDK (UMD build) providing the PocketBase client, auth store, cookie/token helpers, and collection API used by app.js.", "tags": ["vendor", "sdk", "third-party", "minified"], "complexity": "complex", "languageNotes": "Single-line minified UMD bundle; not authored in this project and intentionally not deep-analyzed."}, {"id": "file:scripts/setup_fitbase.py", "type": "file", "name": "setup_fitbase.py", "filePath": "scripts/setup_fitbase.py", "summary": "One-off provisioning script that authenticates as a PocketBase superuser, creates the exercises/workouts/sessions collections with their API rules, and batch-imports the exercise dataset.", "tags": ["script", "provisioning", "database", "seed", "pocketbase"], "complexity": "moderate", "languageNotes": "Uses only the Python standard library (urllib-style REST calls) to talk to the PocketBase admin API; run once out-of-band, not part of the deployed frontend."}, {"id": "function:app.js:route", "type": "function", "name": "route", "filePath": "app.js", "lineRange": [75, 86], "summary": "Hash-router dispatcher: parses the URL hash, updates nav active state, refreshes the auth box, and invokes the matching view renderer from the routes map.", "tags": ["router", "navigation", "dispatch"], "complexity": "simple"}, {"id": "function:app.js:renderAuth", "type": "function", "name": "renderAuth", "filePath": "app.js", "lineRange": [98, 113], "summary": "Renders the sign-in / sign-up form view and wires its submit handler.", "tags": ["auth", "view", "form"], "complexity": "simple"}, {"id": "function:app.js:renderForgot", "type": "function", "name": "renderForgot", "filePath": "app.js", "lineRange": [115, 128], "summary": "Renders the forgot-password request view where the user enters their email to receive a reset link.", "tags": ["auth", "view", "password-reset"], "complexity": "simple"}, {"id": "function:app.js:doForgot", "type": "function", "name": "doForgot", "filePath": "app.js", "lineRange": [130, 142], "summary": "Submits the forgot-password form by calling PocketBase requestPasswordReset for the entered email and reporting status.", "tags": ["auth", "password-reset", "event-handler"], "complexity": "simple"}, {"id": "function:app.js:renderResetConfirm", "type": "function", "name": "renderResetConfirm", "filePath": "app.js", "lineRange": [144, 158], "summary": "Renders the in-app reset-confirm view for a reset token, letting the user set a new password.", "tags": ["auth", "view", "password-reset"], "complexity": "simple"}, {"id": "function:app.js:doReset", "type": "function", "name": "doReset", "filePath": "app.js", "lineRange": [160, 176], "summary": "Submits the reset-confirm form via PocketBase confirmPasswordReset, validating the new password and redirecting to sign-in on success.", "tags": ["auth", "password-reset", "event-handler"], "complexity": "simple"}, {"id": "function:app.js:doAuth", "type": "function", "name": "doAuth", "filePath": "app.js", "lineRange": [186, 202], "summary": "Handles the auth form submit: creates a new user (sign-up mode) then authenticates with email/password against the PocketBase users collection.", "tags": ["auth", "event-handler", "login"], "complexity": "simple"}, {"id": "function:app.js:renderLibrary", "type": "function", "name": "renderLibrary", "filePath": "app.js", "lineRange": [213, 253], "summary": "Renders the exercise library view: loads the catalog, builds equipment/target/category filter controls, and wires filter events that repaint the exercise grid.", "tags": ["view", "exercise-library", "filtering"], "complexity": "moderate"}, {"id": "function:app.js:paintGrid", "type": "function", "name": "paintGrid", "filePath": "app.js", "lineRange": [264, 282], "summary": "Renders the filtered, paginated grid of exercise cards with lazy-loaded images pointing at the media CDN.", "tags": ["view", "exercise-library", "pagination"], "complexity": "simple"}, {"id": "function:app.js:openDetail", "type": "function", "name": "openDetail", "filePath": "app.js", "lineRange": [284, 319], "summary": "Fetches a single exercise and opens a modal showing its media, muscles, instructions, and a language selector for localized step text.", "tags": ["view", "modal", "exercise-detail"], "complexity": "moderate"}, {"id": "function:app.js:renderWorkouts", "type": "function", "name": "renderWorkouts", "filePath": "app.js", "lineRange": [323, 348], "summary": "Renders the workouts list view (auth-gated), delegating to the editor for a specific id, and offering create/start/delete actions per workout.", "tags": ["view", "workout-builder", "list"], "complexity": "moderate"}, {"id": "function:app.js:renderWorkoutEditor", "type": "function", "name": "renderWorkoutEditor", "filePath": "app.js", "lineRange": [365, 396], "summary": "Renders the editor for a single workout: its ordered exercise items with sets/reps inputs and reorder/remove controls.", "tags": ["view", "workout-builder", "editor"], "complexity": "moderate"}, {"id": "function:app.js:pickWorkout", "type": "function", "name": "pickWorkout", "filePath": "app.js", "lineRange": [424, 440], "summary": "Opens a modal to add an exercise to an existing workout or to a newly named one.", "tags": ["modal", "workout-builder", "event-handler"], "complexity": "simple"}, {"id": "function:app.js:addToWorkout", "type": "function", "name": "addToWorkout", "filePath": "app.js", "lineRange": [442, 452], "summary": "Appends an exercise (deduped) to a workout's items and persists the updated item list to PocketBase.", "tags": ["workout-builder", "persistence", "event-handler"], "complexity": "simple"}, {"id": "function:app.js:startSession", "type": "function", "name": "startSession", "filePath": "app.js", "lineRange": [464, 476], "summary": "Initializes an in-memory training session from a workout, seeding per-exercise set entries, then navigates to the session view.", "tags": ["training-session", "state", "event-handler"], "complexity": "simple"}, {"id": "function:app.js:renderSession", "type": "function", "name": "renderSession", "filePath": "app.js", "lineRange": [478, 508], "summary": "Renders the live training session UI: per-exercise set rows with reps/weight inputs plus add/remove-set controls and a form-check link.", "tags": ["view", "training-session", "logging"], "complexity": "moderate"}, {"id": "function:app.js:finishSession", "type": "function", "name": "finishSession", "filePath": "app.js", "lineRange": [523, 536], "summary": "Filters out empty sets and persists the completed session (entries + notes) to the PocketBase sessions collection.", "tags": ["training-session", "persistence", "event-handler"], "complexity": "simple"}, {"id": "function:app.js:renderHistory", "type": "function", "name": "renderHistory", "filePath": "app.js", "lineRange": [540, 563], "summary": "Renders the training-history view (auth-gated), listing past sessions with computed set counts and volume totals and expandable per-exercise detail.", "tags": ["view", "history", "analytics"], "complexity": "moderate"}, {"id": "function:scripts/setup_fitbase.py:req", "type": "function", "name": "req", "filePath": "scripts/setup_fitbase.py", "lineRange": [22, 32], "summary": "Thin HTTP helper that issues an authenticated JSON request to the PocketBase REST API and returns the decoded response.", "tags": ["utility", "http", "api-client"], "complexity": "simple"}, {"id": "function:scripts/setup_fitbase.py:ensure_collection", "type": "function", "name": "ensure_collection", "filePath": "scripts/setup_fitbase.py", "lineRange": [54, 63], "summary": "Idempotently creates a PocketBase collection from a schema payload, tolerating the already-exists case.", "tags": ["provisioning", "database", "idempotent"], "complexity": "simple"}], "edges": [{"source": "file:index.html", "target": "file:pocketbase.umd.js", "type": "depends_on", "direction": "forward", "weight": 0.6}, {"source": "file:index.html", "target": "file:app.js", "type": "depends_on", "direction": "forward", "weight": 0.6}, {"source": "file:index.html", "target": "file:app.css", "type": "depends_on", "direction": "forward", "weight": 0.6}, {"source": "document:README.md", "target": "file:index.html", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:README.md", "target": "file:app.js", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:README.md", "target": "file:scripts/setup_fitbase.py", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:AGENTS.md", "target": "file:app.js", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:CLAUDE.md", "target": "file:app.js", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:CLAUDE.md", "target": "document:AGENTS.md", "type": "related", "direction": "forward", "weight": 0.5}, {"source": "file:app.js", "target": "function:app.js:route", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderAuth", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:doAuth", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderLibrary", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:paintGrid", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:openDetail", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderWorkouts", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderWorkoutEditor", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:pickWorkout", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:addToWorkout", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:startSession", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderSession", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:finishSession", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderHistory", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "file:pocketbase.umd.js", "type": "depends_on", "direction": "forward", "weight": 0.6}, {"source": "file:scripts/setup_fitbase.py", "target": "function:scripts/setup_fitbase.py:req", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:scripts/setup_fitbase.py", "target": "function:scripts/setup_fitbase.py:ensure_collection", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:scripts/setup_fitbase.py", "target": "function:scripts/setup_fitbase.py:req", "type": "exports", "direction": "forward", "weight": 0.8}, {"source": "file:scripts/setup_fitbase.py", "target": "function:scripts/setup_fitbase.py:ensure_collection", "type": "exports", "direction": "forward", "weight": 0.8}, {"source": "file:scripts/setup_fitbase.py", "target": "file:app.js", "type": "related", "direction": "forward", "weight": 0.5}, {"source": "document:docs/DESIGN.md", "target": "file:app.js", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:docs/DESIGN.md", "target": "file:scripts/setup_fitbase.py", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:docs/DESIGN.md", "target": "document:README.md", "type": "related", "direction": "forward", "weight": 0.5}, {"source": "document:README.md", "target": "file:app.css", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:AGENTS.md", "target": "file:index.html", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "document:CLAUDE.md", "target": "file:index.html", "type": "documents", "direction": "forward", "weight": 0.5}, {"source": "file:app.js", "target": "function:app.js:renderForgot", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:doForgot", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:renderResetConfirm", "type": "contains", "direction": "forward", "weight": 1.0}, {"source": "file:app.js", "target": "function:app.js:doReset", "type": "contains", "direction": "forward", "weight": 1.0}], "layers": [{"id": "layer:app-shell", "name": "App Shell & Markup", "description": "The single-page HTML shell that wires nav, social meta, and script tags, plus the dark-theme stylesheet that lays out the library, workout builder, session runner, and history views.", "nodeIds": ["file:index.html", "file:app.css"]}, {"id": "layer:spa-logic", "name": "SPA Logic", "description": "The buildless hash-routed client (app.js) that renders every view and talks to the same-origin PocketBase backend, together with the vendored PocketBase JS SDK it depends on.", "nodeIds": ["file:app.js", "file:pocketbase.umd.js"]}, {"id": "layer:backend-setup", "name": "Backend Setup & Data", "description": "The one-off provisioning script that creates the exercises/workouts/sessions PocketBase collections with their API rules and seeds the exercise dataset.", "nodeIds": ["file:scripts/setup_fitbase.py"]}, {"id": "layer:docs", "name": "Documentation", "description": "Project overview, design notes, and agent-facing build guides covering the webface.cloud platform rules, PocketBase data model, and SDK conventions.", "nodeIds": ["document:README.md", "document:AGENTS.md", "document:CLAUDE.md", "document:docs/DESIGN.md"]}], "tour": [{"order": 1, "title": "Project Overview", "description": "Start with the README to learn what FitBase is: a buildless single-page app on webface.cloud offering an exercise library, workout builder, and training log, backed by a same-origin PocketBase instance. The README also documents the three core collections (exercises, workouts, sessions) with their fields and the exercise dataset/media licensing, giving you the data model before you meet the code. Keep this collection layout in mind \u2014 every view you'll tour reads and writes to exactly these three tables.", "nodeIds": ["document:README.md"]}, {"order": 2, "title": "The App Shell", "description": "index.html is the entire HTML surface: it carries the OG/Twitter social meta and analytics tracker, defines the hash-routed nav (Library, Workouts, History) plus a single view container, and loads the PocketBase SDK, app.js, and app.css. app.css is the dark-theme stylesheet that lays out the top bar, exercise grid, modal, auth card, workout builder, session runner, and history \u2014 the only styling in the project. Because there is no build step, these two static files are shipped as-is to the browser.", "nodeIds": ["file:index.html", "file:app.css"], "languageLesson": "A buildless SPA relies on the browser natively parsing ES modules and plain CSS \u2014 no bundler, transpiler, or framework runtime. The single #view container plus a hash router is the whole app skeleton."}, {"order": 3, "title": "The SPA Core & Router", "description": "app.js is the heart of FitBase and, by fan-in, the most depended-upon file in the project \u2014 the shell loads it and every doc points back to it. It is a single buildless module whose route() function reads window.location.hash and swaps the active view into the #view container. All data access flows through the vendored PocketBase SDK (pocketbase.umd.js), which app.js instantiates against the same origin to get the client, auth store, and collection API. Understanding route() is the map for everything that follows: each hash maps to one render function.", "nodeIds": ["file:app.js", "function:app.js:route", "file:pocketbase.umd.js"], "languageLesson": "Hash routing (#/library) lets a static SPA do client-side navigation with zero server config \u2014 the browser never issues a new request, so the same index.html serves every route."}, {"order": 4, "title": "Authentication & Password Reset", "description": "Before any collection is readable, the user must authenticate. renderAuth draws the login/signup card and doAuth calls the PocketBase auth store to establish a session. The forgot-password path is fully in-app: doForgot requests a reset email via the SDK, while renderResetConfirm shows the token-entry form and doReset submits the new password back to PocketBase. This is the one flow that spans multiple views yet lives entirely in the client, relying on PocketBase's built-in auth endpoints rather than any server code.", "nodeIds": ["function:app.js:renderAuth", "function:app.js:doAuth", "function:app.js:doForgot", "function:app.js:renderResetConfirm", "function:app.js:doReset"]}, {"order": 5, "title": "The Exercise Library", "description": "With a session established, renderLibrary is the default landing view. It fetches the exercises collection and hands the records to paintGrid, which renders the card grid you saw styled in app.css. Clicking a card triggers openDetail, opening the exercise modal with the full description and media. This read-only browsing view is the simplest example of the app's pattern: fetch a collection, paint the DOM, wire click handlers.", "nodeIds": ["function:app.js:renderLibrary", "function:app.js:paintGrid", "function:app.js:openDetail"]}, {"order": 6, "title": "Workout Builder, Sessions & History", "description": "This is FitBase's core loop. renderWorkouts lists saved workouts and renderWorkoutEditor lets the user assemble one from library exercises (via addToWorkout). startSession turns a workout into a live training run, and finishSession writes the completed set/rep data into the sessions collection. renderHistory then reads those sessions back to show past training. Together these views connect all three PocketBase collections \u2014 exercises feed workouts, workouts drive sessions, sessions become history.", "nodeIds": ["function:app.js:renderWorkouts", "function:app.js:renderWorkoutEditor", "function:app.js:startSession", "function:app.js:finishSession", "function:app.js:renderHistory"]}, {"order": 7, "title": "Backend Setup & Data Seeding", "description": "Everything the client reads assumes the PocketBase backend already exists \u2014 that provisioning happens here. setup_fitbase.py is a one-off script that authenticates as a superuser and uses ensure_collection (built on the low-level req helper) to create the exercises, workouts, and sessions collections with their API access rules, then batch-imports the exercise dataset. The companion DESIGN.md captures the scope and architecture decisions behind this layout. Run once, this script is what makes the same-origin data model from Step 1 real.", "nodeIds": ["file:scripts/setup_fitbase.py", "function:scripts/setup_fitbase.py:ensure_collection", "function:scripts/setup_fitbase.py:req", "document:docs/DESIGN.md"], "languageLesson": "PocketBase collection API rules are declarative filter expressions stored on each collection \u2014 the setup script provisions them once so the buildless client needs no server-side authorization code of its own."}]}
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "FitBase",
+    "languages": [
+      "css",
+      "go",
+      "html",
+      "javascript",
+      "markdown",
+      "mod",
+      "python",
+      "shell"
+    ],
+    "frameworks": [
+      "PocketBase"
+    ],
+    "description": "A home-gym AI coaching product + coach marketplace running as a custom Go PocketBase binary serving a buildless JS SPA.",
+    "analyzedAt": "2026-07-31T17:42:47.485924",
+    "gitCommitHash": "01072f215a8e5f2a53d5180b3bebb9347939bc19"
+  },
+  "nodes": [
+    {
+      "id": "document:AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "AGENTS.md",
+      "summary": "Agent-facing build guide for the buildless frontend half of the app on webface.cloud, laying out hard rules (never build a server, same-origin PocketBase SDK, escape DOM content, keep it buildless) and canonical PocketBase JS SDK patterns.",
+      "tags": [
+        "documentation",
+        "agent-guide",
+        "frontend",
+        "pocketbase",
+        "conventions"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:CLAUDE.md",
+      "type": "document",
+      "name": "CLAUDE.md",
+      "filePath": "CLAUDE.md",
+      "summary": "Project memory documenting FitBase's custom Go PocketBase binary architecture \u2014 the two-halves split (buildless SPA frontend + server/ Go module), the operator build-and-ship path for the binary, server-side app.env config, and the collection model.",
+      "tags": [
+        "documentation",
+        "architecture",
+        "deployment",
+        "custom-binary",
+        "pocketbase"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Documents a Go module using replace directives to import the webface.cloud platform, plus operator-only build/scp/systemctl deploy steps distinct from the git webhook."
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Product and architecture overview for FitBase \u2014 the home-gym AI coach plus Stripe Connect coach marketplace \u2014 describing each server route file, the frontend SPA, the eight collections, exercise data/media licensing, and server config.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview",
+        "architecture",
+        "marketplace"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:server/main.go",
+      "type": "file",
+      "name": "main.go",
+      "filePath": "server/main.go",
+      "summary": "Entry point for the custom Go PocketBase binary: binds the platform brand via pbbrand.Bind, runs ensureSchema on boot, registers the /api/ai, /api/invite, /api/billing and /hooks/stripe routes, and serves the SPA from pb_public with SPA fallback.",
+      "tags": [
+        "entry-point",
+        "pocketbase",
+        "bootstrap",
+        "routing"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Routes are registered inside app.OnServe().BindFunc; auth-required routes chain .Bind(apis.RequireAuth()) while the Stripe webhook stays unauthenticated (signature-verified)."
+    },
+    {
+      "id": "file:server/ai.go",
+      "type": "file",
+      "name": "ai.go",
+      "filePath": "server/ai.go",
+      "summary": "The server-side AI coach: equipment-aware plan generation and progression, calling Claude over raw HTTP with the Anthropic key held in app.env, validating returned exercise ids against the catalog and retrying, with per-user model tiering.",
+      "tags": [
+        "ai-coach",
+        "api-handler",
+        "claude",
+        "service"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Talks to api.anthropic.com/v1/messages directly via net/http; DTO structs (planReq/planOut/planItem) shape the JSON contract; extractJSON salvages model output."
+    },
+    {
+      "id": "file:server/billing.go",
+      "type": "file",
+      "name": "billing.go",
+      "filePath": "server/billing.go",
+      "summary": "Stripe Connect marketplace backend: coach onboarding (Express accounts), client hire via Checkout with an application fee, and the signature-verified Stripe webhook that records engagements.",
+      "tags": [
+        "billing",
+        "stripe-connect",
+        "marketplace",
+        "api-handler"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Form-encodes requests to api.stripe.com/v1; verifyStripeSig implements HMAC-SHA256 webhook signature checking; application fee derived from feeBps."
+    },
+    {
+      "id": "file:server/coach.go",
+      "type": "file",
+      "name": "coach.go",
+      "filePath": "server/coach.go",
+      "summary": "Coach marketplace invite system (mint/info/accept single-use tokens) plus ensureSchema, a self-healing routine that keeps collection shape (e.g. coach_name on services) in sync and backfills.",
+      "tags": [
+        "marketplace",
+        "invite",
+        "api-handler",
+        "schema-migration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:server/go.mod",
+      "type": "config",
+      "name": "go.mod",
+      "filePath": "server/go.mod",
+      "summary": "Go module manifest for fitbase.webface.cloud/server, pinning PocketBase and wiring the platform via a replace directive to the sibling webface-cloud checkout.",
+      "tags": [
+        "configuration",
+        "go-module",
+        "dependencies"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Uses a local replace webface.cloud/platform => ../../webface-cloud so the binary shares pbbrand branding and retention with the platform."
+    },
+    {
+      "id": "endpoint:server/ai.go:POST /api/ai/plan",
+      "type": "endpoint",
+      "name": "POST /api/ai/plan",
+      "filePath": "server/ai.go",
+      "summary": "Auth-required route that generates an equipment-aware, multi-day workout plan by prompting Claude, validating exercise ids against the catalog and retrying on invalid output.",
+      "tags": [
+        "endpoint",
+        "ai-coach",
+        "api-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:server/ai.go:POST /api/ai/progress",
+      "type": "endpoint",
+      "name": "POST /api/ai/progress",
+      "filePath": "server/ai.go",
+      "summary": "Auth-required route that suggests next-session sets/reps/weight progression for a workout based on recent logged history via Claude.",
+      "tags": [
+        "endpoint",
+        "ai-coach",
+        "progression"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:server/coach.go:POST /api/invite",
+      "type": "endpoint",
+      "name": "POST /api/invite",
+      "filePath": "server/coach.go",
+      "summary": "Auth-required route where a coach invites someone by email, minting a single-use token and returning the accept link.",
+      "tags": [
+        "endpoint",
+        "invite",
+        "marketplace"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server/coach.go:POST /api/invite/accept",
+      "type": "endpoint",
+      "name": "POST /api/invite/accept",
+      "filePath": "server/coach.go",
+      "summary": "Auth-required route where the signed-in invitee accepts an invite token (single-use), establishing the coach/client membership.",
+      "tags": [
+        "endpoint",
+        "invite",
+        "marketplace"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server/coach.go:GET /api/invite/{token}",
+      "type": "endpoint",
+      "name": "GET /api/invite/{token}",
+      "filePath": "server/coach.go",
+      "summary": "Public route returning invite details for the accept page given a token.",
+      "tags": [
+        "endpoint",
+        "invite",
+        "public"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server/billing.go:POST /api/billing/connect",
+      "type": "endpoint",
+      "name": "POST /api/billing/connect",
+      "filePath": "server/billing.go",
+      "summary": "Auth-required coach onboarding route that creates or reuses a Stripe Express connected account and returns an onboarding link.",
+      "tags": [
+        "endpoint",
+        "billing",
+        "stripe-connect"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:server/billing.go:GET /api/billing/status",
+      "type": "endpoint",
+      "name": "GET /api/billing/status",
+      "filePath": "server/billing.go",
+      "summary": "Auth-required route reporting the coach's onboarding and payout-readiness status.",
+      "tags": [
+        "endpoint",
+        "billing",
+        "status"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server/billing.go:POST /api/billing/hire",
+      "type": "endpoint",
+      "name": "POST /api/billing/hire",
+      "filePath": "server/billing.go",
+      "summary": "Auth-required route where a client hires a coach's service, creating a Stripe Checkout session with an application fee and returning the checkout URL.",
+      "tags": [
+        "endpoint",
+        "billing",
+        "checkout",
+        "marketplace"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:server/billing.go:POST /hooks/stripe",
+      "type": "endpoint",
+      "name": "POST /hooks/stripe",
+      "filePath": "server/billing.go",
+      "summary": "Unauthenticated but Stripe-signature-verified webhook that processes checkout/subscription events and records the resulting coach-client engagement.",
+      "tags": [
+        "endpoint",
+        "webhook",
+        "billing",
+        "stripe"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/main.go:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "server/main.go",
+      "lineRange": [
+        23,
+        79
+      ],
+      "summary": "Constructs the branded PocketBase app, registers all custom API routes and the SPA static handler inside OnServe, and starts the server.",
+      "tags": [
+        "entry-point",
+        "bootstrap",
+        "routing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/ai.go:handleAIPlan",
+      "type": "function",
+      "name": "handleAIPlan",
+      "filePath": "server/ai.go",
+      "lineRange": [
+        246,
+        378
+      ],
+      "summary": "Handler for POST /api/ai/plan: builds equipment-scoped candidate exercises, prompts Claude for a structured plan, validates ex_ids and retries, then materializes workouts for the user.",
+      "tags": [
+        "api-handler",
+        "ai-coach",
+        "claude",
+        "validation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:server/ai.go:handleAIProgress",
+      "type": "function",
+      "name": "handleAIProgress",
+      "filePath": "server/ai.go",
+      "lineRange": [
+        413,
+        540
+      ],
+      "summary": "Handler for POST /api/ai/progress: gathers a workout's recent session history and asks Claude for per-exercise progression suggestions.",
+      "tags": [
+        "api-handler",
+        "ai-coach",
+        "progression"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:server/ai.go:callClaudeJSON",
+      "type": "function",
+      "name": "callClaudeJSON",
+      "filePath": "server/ai.go",
+      "lineRange": [
+        173,
+        224
+      ],
+      "summary": "Low-level Claude client: POSTs a system/user prompt to the Anthropic messages API and extracts a JSON object from the response.",
+      "tags": [
+        "claude",
+        "http-client",
+        "ai-coach"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/ai.go:selectCandidates",
+      "type": "function",
+      "name": "selectCandidates",
+      "filePath": "server/ai.go",
+      "lineRange": [
+        67,
+        110
+      ],
+      "summary": "Selects catalog exercises the user can actually perform given their owned equipment, producing the candidate set the model is constrained to.",
+      "tags": [
+        "ai-coach",
+        "equipment",
+        "filtering"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/ai.go:resolvePlan",
+      "type": "function",
+      "name": "resolvePlan",
+      "filePath": "server/ai.go",
+      "lineRange": [
+        21,
+        40
+      ],
+      "summary": "Determines the effective plan/model tier for a user (comp accounts vs free vs paid) driving which Claude model is used.",
+      "tags": [
+        "ai-coach",
+        "model-tiering",
+        "billing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:server/billing.go:handleBillingConnect",
+      "type": "function",
+      "name": "handleBillingConnect",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        60,
+        97
+      ],
+      "summary": "Handler for POST /api/billing/connect: creates or reuses a Stripe Express account for the coach and returns an account onboarding link.",
+      "tags": [
+        "api-handler",
+        "stripe-connect",
+        "onboarding"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/billing.go:handleBillingStatus",
+      "type": "function",
+      "name": "handleBillingStatus",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        100,
+        110
+      ],
+      "summary": "Handler for GET /api/billing/status: returns the coach's onboarding and payout-readiness flags.",
+      "tags": [
+        "api-handler",
+        "billing",
+        "status"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:server/billing.go:handleBillingHire",
+      "type": "function",
+      "name": "handleBillingHire",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        114,
+        175
+      ],
+      "summary": "Handler for POST /api/billing/hire: creates a Stripe Checkout session for a service with a marketplace application fee routed to the coach's connected account.",
+      "tags": [
+        "api-handler",
+        "checkout",
+        "marketplace",
+        "stripe-connect"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:server/billing.go:handleStripeWebhook",
+      "type": "function",
+      "name": "handleStripeWebhook",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        179,
+        241
+      ],
+      "summary": "Handler for POST /hooks/stripe: verifies the Stripe signature then processes checkout/subscription events, recording the engagement.",
+      "tags": [
+        "api-handler",
+        "webhook",
+        "stripe",
+        "security"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:server/billing.go:stripeForm",
+      "type": "function",
+      "name": "stripeForm",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        30,
+        56
+      ],
+      "summary": "Form-encodes and POSTs a request to the Stripe REST API, returning the decoded JSON response.",
+      "tags": [
+        "http-client",
+        "stripe",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/billing.go:verifyStripeSig",
+      "type": "function",
+      "name": "verifyStripeSig",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        280,
+        314
+      ],
+      "summary": "Verifies a Stripe webhook signature header via HMAC-SHA256 against the signing secret with a constant-time compare.",
+      "tags": [
+        "security",
+        "stripe",
+        "webhook",
+        "cryptography"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/billing.go:linkEngagement",
+      "type": "function",
+      "name": "linkEngagement",
+      "filePath": "server/billing.go",
+      "lineRange": [
+        243,
+        278
+      ],
+      "summary": "Records or updates a coach-client engagement record tying together the service, checkout session and Stripe subscription.",
+      "tags": [
+        "billing",
+        "marketplace",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/coach.go:ensureSchema",
+      "type": "function",
+      "name": "ensureSchema",
+      "filePath": "server/coach.go",
+      "lineRange": [
+        21,
+        52
+      ],
+      "summary": "Self-healing schema routine run at boot: ensures marketplace collection fields (e.g. coach_name on services) exist and backfills them.",
+      "tags": [
+        "schema-migration",
+        "self-healing",
+        "bootstrap"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/coach.go:handleInviteCreate",
+      "type": "function",
+      "name": "handleInviteCreate",
+      "filePath": "server/coach.go",
+      "lineRange": [
+        79,
+        137
+      ],
+      "summary": "Handler for POST /api/invite: mints a single-use invite token for an emailed invitee and returns the accept link.",
+      "tags": [
+        "api-handler",
+        "invite",
+        "marketplace"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server/coach.go:handleInviteInfo",
+      "type": "function",
+      "name": "handleInviteInfo",
+      "filePath": "server/coach.go",
+      "lineRange": [
+        140,
+        161
+      ],
+      "summary": "Handler for GET /api/invite/{token}: returns public invite details for the accept page.",
+      "tags": [
+        "api-handler",
+        "invite",
+        "public"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:server/coach.go:handleInviteAccept",
+      "type": "function",
+      "name": "handleInviteAccept",
+      "filePath": "server/coach.go",
+      "lineRange": [
+        165,
+        214
+      ],
+      "summary": "Handler for POST /api/invite/accept: consumes the single-use token for the signed-in invitee and creates the coach/client membership.",
+      "tags": [
+        "api-handler",
+        "invite",
+        "marketplace"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/DESIGN.md",
+      "type": "document",
+      "name": "DESIGN.md",
+      "filePath": "docs/DESIGN.md",
+      "summary": "Design notes (2026-07-19) capturing FitBase's what/decisions/collections: the custom Go PocketBase binary, server-side AI coach routes, and the planned coach-marketplace collections.",
+      "tags": [
+        "documentation",
+        "design-doc",
+        "architecture"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:public/app.css",
+      "type": "file",
+      "name": "app.css",
+      "filePath": "public/app.css",
+      "summary": "Stylesheet for the buildless SPA shell: dark-theme design tokens (CSS variables), layout for the exercise grid, cards, modals, workout editor, and session/coach views.",
+      "tags": [
+        "stylesheet",
+        "css",
+        "ui",
+        "design-tokens"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Uses CSS custom properties (:root variables) for theming across the whole SPA."
+    },
+    {
+      "id": "file:public/app.js",
+      "type": "file",
+      "name": "app.js",
+      "filePath": "public/app.js",
+      "summary": "The entire FitBase SPA: a hash router with views for the exercise library, workouts, session logging, history, My Gym, coach marketplace and dashboard, plus AI-plan/progress modals and hire/invite flows, all driven by the same-origin PocketBase JS SDK.",
+      "tags": [
+        "entry-point",
+        "spa",
+        "hash-router",
+        "pocketbase-client",
+        "ui"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Buildless vanilla JS: global functions wired to inline onclick handlers, template-literal HTML, and pb.send() calls to the server's custom /api routes. All DB strings escaped via esc() before DOM insertion."
+    },
+    {
+      "id": "file:public/index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "public/index.html",
+      "summary": "The SPA shell: mounts the nav, view container, modal overlay and toast, and loads the vendored PocketBase UMD SDK plus app.css and app.js.",
+      "tags": [
+        "markup",
+        "html",
+        "app-shell",
+        "entry-point"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/deploy.sh",
+      "type": "file",
+      "name": "deploy.sh",
+      "filePath": "scripts/deploy.sh",
+      "summary": "Operator deploy script that cross-compiles the Go binary for linux/amd64, scp's it to the droplet and restarts the wfc-fitbase systemd unit, and separately ships the public/ frontend into the app's pb_public.",
+      "tags": [
+        "script",
+        "deployment",
+        "build-system",
+        "shell"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/setup_fitbase.py",
+      "type": "file",
+      "name": "setup_fitbase.py",
+      "filePath": "scripts/setup_fitbase.py",
+      "summary": "One-shot backend bootstrap: authenticates as superuser, ensures the exercises/workouts/sessions collections exist with their schema and indexes, and seeds the exercise dataset.",
+      "tags": [
+        "script",
+        "seed",
+        "database",
+        "bootstrap"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/setup_fitbase.py:req",
+      "type": "function",
+      "name": "req",
+      "filePath": "scripts/setup_fitbase.py",
+      "lineRange": [
+        22,
+        32
+      ],
+      "summary": "Thin HTTP helper that issues authenticated JSON requests against the PocketBase admin API and returns (status, parsed-body).",
+      "tags": [
+        "utility",
+        "http",
+        "api-client"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/setup_fitbase.py:ensure_collection",
+      "type": "function",
+      "name": "ensure_collection",
+      "filePath": "scripts/setup_fitbase.py",
+      "lineRange": [
+        54,
+        63
+      ],
+      "summary": "Idempotently creates a PocketBase collection from a payload, skipping it when a collection of that name already exists.",
+      "tags": [
+        "utility",
+        "database",
+        "idempotent",
+        "migration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:route",
+      "type": "function",
+      "name": "route",
+      "filePath": "public/app.js",
+      "lineRange": [
+        121,
+        137
+      ],
+      "summary": "The hash router: parses location.hash into a view name plus params, highlights the active nav item, and dispatches to the matching render function.",
+      "tags": [
+        "router",
+        "navigation",
+        "spa",
+        "controller"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderAuth",
+      "type": "function",
+      "name": "renderAuth",
+      "filePath": "public/app.js",
+      "lineRange": [
+        150,
+        165
+      ],
+      "summary": "Renders the sign-in/sign-up form view with a toggle between login and registration modes.",
+      "tags": [
+        "view",
+        "auth",
+        "ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:doAuth",
+      "type": "function",
+      "name": "doAuth",
+      "filePath": "public/app.js",
+      "lineRange": [
+        238,
+        256
+      ],
+      "summary": "Handles auth submit: creates the user on sign-up, authenticates with password via the PocketBase users collection, then honors any pending post-login redirect.",
+      "tags": [
+        "auth",
+        "event-handler",
+        "pocketbase-client"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderLibrary",
+      "type": "function",
+      "name": "renderLibrary",
+      "filePath": "public/app.js",
+      "lineRange": [
+        267,
+        316
+      ],
+      "summary": "Renders the exercise library view: loads the catalog and gym profile, builds category/equipment/target filter controls, and wires filter events to repaint the grid.",
+      "tags": [
+        "view",
+        "exercise-library",
+        "filtering",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:renderGym",
+      "type": "function",
+      "name": "renderGym",
+      "filePath": "public/app.js",
+      "lineRange": [
+        320,
+        356
+      ],
+      "summary": "Renders the My Gym view where a user toggles which equipment they own; persists the selection to the gym_profiles collection.",
+      "tags": [
+        "view",
+        "my-gym",
+        "equipment",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:paintGrid",
+      "type": "function",
+      "name": "paintGrid",
+      "filePath": "public/app.js",
+      "lineRange": [
+        369,
+        387
+      ],
+      "summary": "Paints the filtered, paginated exercise card grid into the library container.",
+      "tags": [
+        "ui",
+        "rendering",
+        "pagination"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:openDetail",
+      "type": "function",
+      "name": "openDetail",
+      "filePath": "public/app.js",
+      "lineRange": [
+        389,
+        424
+      ],
+      "summary": "Opens the exercise detail modal: fetches the full exercise record, shows the animated GIF, muscles, per-language instructions and step list.",
+      "tags": [
+        "modal",
+        "exercise-detail",
+        "ui",
+        "i18n"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:renderWorkouts",
+      "type": "function",
+      "name": "renderWorkouts",
+      "filePath": "public/app.js",
+      "lineRange": [
+        428,
+        457
+      ],
+      "summary": "Renders the Workouts list view: existing workouts with edit/start/delete actions plus create-new and AI-plan entry points.",
+      "tags": [
+        "view",
+        "workouts",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:openAIPlan",
+      "type": "function",
+      "name": "openAIPlan",
+      "filePath": "public/app.js",
+      "lineRange": [
+        469,
+        494
+      ],
+      "summary": "Opens the AI plan-generation modal collecting goal, days/week, session length, experience and injuries before requesting an equipment-aware plan.",
+      "tags": [
+        "modal",
+        "ai-coach",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:doAIPlan",
+      "type": "function",
+      "name": "doAIPlan",
+      "filePath": "public/app.js",
+      "lineRange": [
+        496,
+        522
+      ],
+      "summary": "Submits the AI plan request to POST /api/ai/plan, then reloads and re-renders the generated workouts.",
+      "tags": [
+        "ai-coach",
+        "event-handler",
+        "api-call"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:renderWorkoutEditor",
+      "type": "function",
+      "name": "renderWorkoutEditor",
+      "filePath": "public/app.js",
+      "lineRange": [
+        531,
+        563
+      ],
+      "summary": "Renders the single-workout editor: reorderable exercise items with sets/reps inputs plus an AI progression suggestion action.",
+      "tags": [
+        "view",
+        "workout-editor",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:suggestProgress",
+      "type": "function",
+      "name": "suggestProgress",
+      "filePath": "public/app.js",
+      "lineRange": [
+        566,
+        604
+      ],
+      "summary": "Requests AI progression via POST /api/ai/progress using the workout's recent history and renders the suggested next sets/reps/weight in a modal.",
+      "tags": [
+        "ai-coach",
+        "progression",
+        "api-call",
+        "modal"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:applyProgress",
+      "type": "function",
+      "name": "applyProgress",
+      "filePath": "public/app.js",
+      "lineRange": [
+        606,
+        620
+      ],
+      "summary": "Applies the AI-suggested progression back onto the workout's items and saves them.",
+      "tags": [
+        "ai-coach",
+        "progression",
+        "event-handler"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:startSession",
+      "type": "function",
+      "name": "startSession",
+      "filePath": "public/app.js",
+      "lineRange": [
+        688,
+        700
+      ],
+      "summary": "Begins a live logging session from a workout, seeding per-exercise set entries in local state.",
+      "tags": [
+        "session",
+        "workout-logging",
+        "state"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderSession",
+      "type": "function",
+      "name": "renderSession",
+      "filePath": "public/app.js",
+      "lineRange": [
+        702,
+        732
+      ],
+      "summary": "Renders the active workout-logging session UI with per-set reps/weight inputs and add/delete-set controls.",
+      "tags": [
+        "view",
+        "session",
+        "workout-logging",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:finishSession",
+      "type": "function",
+      "name": "finishSession",
+      "filePath": "public/app.js",
+      "lineRange": [
+        747,
+        760
+      ],
+      "summary": "Finalizes a session, persisting the logged sets to the sessions collection and returning to the workouts view.",
+      "tags": [
+        "session",
+        "workout-logging",
+        "pocketbase-client"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderHistory",
+      "type": "function",
+      "name": "renderHistory",
+      "filePath": "public/app.js",
+      "lineRange": [
+        764,
+        787
+      ],
+      "summary": "Renders the workout history view listing past logged sessions.",
+      "tags": [
+        "view",
+        "history",
+        "ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderCoach",
+      "type": "function",
+      "name": "renderCoach",
+      "filePath": "public/app.js",
+      "lineRange": [
+        793,
+        847
+      ],
+      "summary": "Renders the coach dashboard: payout/onboarding status, services management, client invites and the coach's engaged clients.",
+      "tags": [
+        "view",
+        "coach-dashboard",
+        "marketplace",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:createService",
+      "type": "function",
+      "name": "createService",
+      "filePath": "public/app.js",
+      "lineRange": [
+        849,
+        860
+      ],
+      "summary": "Creates a new coaching service offering for the signed-in coach.",
+      "tags": [
+        "coach-dashboard",
+        "marketplace",
+        "event-handler"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:sendInvite",
+      "type": "function",
+      "name": "sendInvite",
+      "filePath": "public/app.js",
+      "lineRange": [
+        871,
+        885
+      ],
+      "summary": "Sends a client/coach invite by email via POST /api/invite and surfaces the returned invite link.",
+      "tags": [
+        "marketplace",
+        "invite",
+        "api-call"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderCoaches",
+      "type": "function",
+      "name": "renderCoaches",
+      "filePath": "public/app.js",
+      "lineRange": [
+        900,
+        917
+      ],
+      "summary": "Renders the Find a Coach marketplace view listing available coaching services with a hire action.",
+      "tags": [
+        "view",
+        "marketplace",
+        "ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:hireService",
+      "type": "function",
+      "name": "hireService",
+      "filePath": "public/app.js",
+      "lineRange": [
+        919,
+        931
+      ],
+      "summary": "Initiates hiring a coach's service via POST /api/billing/hire and redirects the client to Stripe Checkout.",
+      "tags": [
+        "marketplace",
+        "billing",
+        "checkout",
+        "api-call"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:public/app.js:renderAccept",
+      "type": "function",
+      "name": "renderAccept",
+      "filePath": "public/app.js",
+      "lineRange": [
+        933,
+        972
+      ],
+      "summary": "Renders the invite-accept page: fetches invite info via GET /api/invite/{token} and accepts it via POST /api/invite/accept once signed in.",
+      "tags": [
+        "view",
+        "invite",
+        "marketplace",
+        "api-call"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:public/app.js:renderHome",
+      "type": "function",
+      "name": "renderHome",
+      "filePath": "public/app.js",
+      "lineRange": [
+        976,
+        1091
+      ],
+      "summary": "Renders the marketing landing page for signed-out visitors, describing the AI coach and coach marketplace with calls to action.",
+      "tags": [
+        "view",
+        "landing-page",
+        "marketing",
+        "ui"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:CLAUDE.md",
+      "target": "document:docs/DESIGN.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "file:server/main.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "file:server/ai.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "file:public/index.html",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "file:public/app.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:server/main.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:server/ai.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:server/coach.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:server/billing.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:public/index.html",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:public/app.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:scripts/setup_fitbase.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:scripts/deploy.sh",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "file:public/index.html",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "file:public/app.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "function:server/main.go:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "function:server/ai.go:handleAIPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "function:server/ai.go:handleAIProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "function:server/ai.go:callClaudeJSON",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "function:server/ai.go:selectCandidates",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "function:server/ai.go:resolvePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:handleBillingConnect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:handleBillingStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:handleBillingHire",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:handleStripeWebhook",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:stripeForm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:verifyStripeSig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "function:server/billing.go:linkEngagement",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "function:server/coach.go:ensureSchema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "function:server/coach.go:handleInviteCreate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "function:server/coach.go:handleInviteInfo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "function:server/coach.go:handleInviteAccept",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "endpoint:server/ai.go:POST /api/ai/plan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/ai.go",
+      "target": "endpoint:server/ai.go:POST /api/ai/progress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "endpoint:server/coach.go:POST /api/invite",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "endpoint:server/coach.go:POST /api/invite/accept",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/coach.go",
+      "target": "endpoint:server/coach.go:GET /api/invite/{token}",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "endpoint:server/billing.go:POST /api/billing/connect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "endpoint:server/billing.go:GET /api/billing/status",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "endpoint:server/billing.go:POST /api/billing/hire",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/billing.go",
+      "target": "endpoint:server/billing.go:POST /hooks/stripe",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/ai.go:POST /api/ai/plan",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/ai.go:POST /api/ai/progress",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/coach.go:POST /api/invite",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/coach.go:POST /api/invite/accept",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/coach.go:GET /api/invite/{token}",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/billing.go:POST /api/billing/connect",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/billing.go:GET /api/billing/status",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/billing.go:POST /api/billing/hire",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:server/main.go",
+      "target": "endpoint:server/billing.go:POST /hooks/stripe",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "function:server/main.go:main",
+      "target": "function:server/coach.go:ensureSchema",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "endpoint:server/ai.go:POST /api/ai/plan",
+      "target": "function:server/ai.go:handleAIPlan",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/ai.go:POST /api/ai/progress",
+      "target": "function:server/ai.go:handleAIProgress",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/coach.go:POST /api/invite",
+      "target": "function:server/coach.go:handleInviteCreate",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/coach.go:POST /api/invite/accept",
+      "target": "function:server/coach.go:handleInviteAccept",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/coach.go:GET /api/invite/{token}",
+      "target": "function:server/coach.go:handleInviteInfo",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/billing.go:POST /api/billing/connect",
+      "target": "function:server/billing.go:handleBillingConnect",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/billing.go:GET /api/billing/status",
+      "target": "function:server/billing.go:handleBillingStatus",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/billing.go:POST /api/billing/hire",
+      "target": "function:server/billing.go:handleBillingHire",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "endpoint:server/billing.go:POST /hooks/stripe",
+      "target": "function:server/billing.go:handleStripeWebhook",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "function:server/ai.go:handleAIPlan",
+      "target": "function:server/ai.go:selectCandidates",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/ai.go:handleAIPlan",
+      "target": "function:server/ai.go:callClaudeJSON",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/ai.go:handleAIPlan",
+      "target": "function:server/ai.go:resolvePlan",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/ai.go:handleAIProgress",
+      "target": "function:server/ai.go:callClaudeJSON",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/billing.go:handleBillingConnect",
+      "target": "function:server/billing.go:stripeForm",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/billing.go:handleBillingHire",
+      "target": "function:server/billing.go:stripeForm",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/billing.go:handleBillingHire",
+      "target": "function:server/billing.go:linkEngagement",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/billing.go:handleStripeWebhook",
+      "target": "function:server/billing.go:verifyStripeSig",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:server/billing.go:handleStripeWebhook",
+      "target": "function:server/billing.go:linkEngagement",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:server/go.mod",
+      "target": "file:server/main.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:route",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderAuth",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:doAuth",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderLibrary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderGym",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:paintGrid",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:openDetail",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderWorkouts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:openAIPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:doAIPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderWorkoutEditor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:suggestProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:applyProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:startSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:finishSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderHistory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderCoach",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:createService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:sendInvite",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderCoaches",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:hireService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderAccept",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "function:public/app.js:renderHome",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/setup_fitbase.py",
+      "target": "function:scripts/setup_fitbase.py:req",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/setup_fitbase.py",
+      "target": "function:scripts/setup_fitbase.py:ensure_collection",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/setup_fitbase.py",
+      "target": "function:scripts/setup_fitbase.py:req",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/setup_fitbase.py",
+      "target": "function:scripts/setup_fitbase.py:ensure_collection",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:doAIPlan",
+      "target": "endpoint:server/ai.go:POST /api/ai/plan",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:suggestProgress",
+      "target": "endpoint:server/ai.go:POST /api/ai/progress",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:renderCoach",
+      "target": "endpoint:server/billing.go:GET /api/billing/status",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:public/app.js",
+      "target": "endpoint:server/billing.go:POST /api/billing/connect",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:sendInvite",
+      "target": "endpoint:server/coach.go:POST /api/invite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:hireService",
+      "target": "endpoint:server/billing.go:POST /api/billing/hire",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:renderAccept",
+      "target": "endpoint:server/coach.go:GET /api/invite/{token}",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:public/app.js:renderAccept",
+      "target": "endpoint:server/coach.go:POST /api/invite/accept",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:public/index.html",
+      "target": "file:public/app.js",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:public/index.html",
+      "target": "file:public/app.css",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:docs/DESIGN.md",
+      "target": "file:public/app.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/DESIGN.md",
+      "target": "file:server/main.go",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scripts/deploy.sh",
+      "target": "file:server/main.go",
+      "type": "deploys",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:scripts/deploy.sh",
+      "target": "file:public/app.js",
+      "type": "deploys",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:frontend",
+      "name": "Frontend SPA",
+      "description": "The buildless single-page app served from pb_public \u2014 hash-routed views for the exercise library, workouts, session logging, My Gym, and the coach marketplace, driven by the same-origin PocketBase JS SDK.",
+      "nodeIds": [
+        "file:public/index.html",
+        "file:public/app.js",
+        "file:public/app.css"
+      ]
+    },
+    {
+      "id": "layer:ai-coach",
+      "name": "AI Coach",
+      "description": "The server-side AI coaching engine that prompts Claude over raw HTTP to generate equipment-aware workout plans and progression suggestions, validating exercise ids against the catalog.",
+      "nodeIds": [
+        "file:server/ai.go",
+        "endpoint:server/ai.go:POST /api/ai/plan",
+        "endpoint:server/ai.go:POST /api/ai/progress"
+      ]
+    },
+    {
+      "id": "layer:marketplace",
+      "name": "Coach Marketplace",
+      "description": "The coach-client marketplace invite system \u2014 minting, reading, and accepting single-use invite tokens \u2014 plus the self-healing ensureSchema routine that keeps collection shape in sync.",
+      "nodeIds": [
+        "file:server/coach.go",
+        "endpoint:server/coach.go:POST /api/invite",
+        "endpoint:server/coach.go:POST /api/invite/accept",
+        "endpoint:server/coach.go:GET /api/invite/{token}"
+      ]
+    },
+    {
+      "id": "layer:billing",
+      "name": "Billing & Payments",
+      "description": "The Stripe Connect backend handling coach onboarding via Express accounts, client hire through Checkout with an application fee, and the signature-verified webhook that records engagements.",
+      "nodeIds": [
+        "file:server/billing.go",
+        "endpoint:server/billing.go:POST /api/billing/connect",
+        "endpoint:server/billing.go:GET /api/billing/status",
+        "endpoint:server/billing.go:POST /api/billing/hire",
+        "endpoint:server/billing.go:POST /hooks/stripe"
+      ]
+    },
+    {
+      "id": "layer:platform",
+      "name": "Platform & Bootstrap",
+      "description": "The custom Go PocketBase binary's entry point \u2014 brand binding, boot-time schema check, route registration, and SPA serving \u2014 together with the Go module manifest that pins PocketBase and wires in the platform.",
+      "nodeIds": [
+        "file:server/main.go",
+        "config:server/go.mod"
+      ]
+    },
+    {
+      "id": "layer:tooling",
+      "name": "Build & Ops Tooling",
+      "description": "Operator scripts that cross-compile and ship the binary and frontend to the droplet, and the one-shot bootstrap that ensures collections exist and seeds the exercise dataset.",
+      "nodeIds": [
+        "file:scripts/deploy.sh",
+        "file:scripts/setup_fitbase.py"
+      ]
+    },
+    {
+      "id": "layer:documentation",
+      "name": "Documentation",
+      "description": "Product, architecture, and agent-facing guides \u2014 README, CLAUDE.md, AGENTS.md, and the DESIGN notes \u2014 covering the two-halves split, custom-binary build path, and collection model.",
+      "nodeIds": [
+        "document:README.md",
+        "document:CLAUDE.md",
+        "document:AGENTS.md",
+        "document:docs/DESIGN.md"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "What FitBase Is",
+      "description": "Start with the README to understand the product before any code. FitBase is not just an exercise log \u2014 it is a home-gym AI coaching product paired with a Stripe Connect coach marketplace. The through-line to keep in mind for the whole tour: a member inventories the equipment they own, the AI builds them a plan from it, they log and progress, and they can optionally hire a real coach who gets paid through the platform. The README also names each server route file, the SPA, and the eight collections, so it doubles as a map for the steps ahead.",
+      "nodeIds": [
+        "document:README.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "The Architectural Key: A Custom Go Binary",
+      "description": "This is the decision everything else depends on. Most webface.cloud apps are buildless static SPAs, but FitBase ships as a CUSTOM Go PocketBase binary \u2014 and that is what unlocks trusted server-side code. main.go is the entry point: it binds the platform brand, runs ensureSchema on boot to self-heal the collections, registers the /api/ai, /api/invite, /api/billing and /hooks/stripe routes, then serves the SPA from pb_public with an SPA fallback. Because these routes run server-side, the Anthropic key and Stripe secrets live in app.env and never touch the browser. CLAUDE.md documents this two-halves split (buildless frontend + Go server module), and go.mod pins PocketBase and wires in the platform via a replace directive.",
+      "nodeIds": [
+        "document:CLAUDE.md",
+        "file:server/main.go",
+        "config:server/go.mod"
+      ],
+      "languageLesson": "Go's PocketBase-as-a-framework pattern: instead of running the stock PocketBase binary, you import it as a module and register your own routes in main(), producing a single self-contained static binary that is both the database and the API server."
+    },
+    {
+      "order": 3,
+      "title": "The AI Coach",
+      "description": "This is the heart of the product and the first server route file to read. ai.go generates an equipment-aware weekly plan by prompting Claude over raw HTTP \u2014 it only proposes moves the member can actually do with the gear in their My Gym inventory. Critically, it validates every returned exercise id against the catalog and retries on invalid output, so the coach never hallucinates a nonexistent movement. The POST /api/ai/plan endpoint builds the multi-day plan, while POST /api/ai/progress reads recent logged sessions and suggests progressive overload (next-session sets, reps, and weight). Both are auth-required, and both keep the Anthropic key server-side per the architecture from Step 2.",
+      "nodeIds": [
+        "file:server/ai.go",
+        "endpoint:server/ai.go:POST /api/ai/plan",
+        "endpoint:server/ai.go:POST /api/ai/progress"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "The Coach Marketplace: Invites",
+      "description": "Once a member has an AI plan, FitBase lets them bring in a human coach \u2014 and coach.go is where that relationship begins. A coach invites a client by email via POST /api/invite, which mints a single-use token and returns an accept link; GET /api/invite/{token} is the public route that reads invite details for the accept page; and POST /api/invite/accept establishes the coach/client membership when the signed-in invitee accepts. This file also houses ensureSchema \u2014 the same self-healing routine main.go runs on boot \u2014 which keeps collection shape (like coach_name on services) in sync and backfills existing rows.",
+      "nodeIds": [
+        "file:server/coach.go",
+        "endpoint:server/coach.go:POST /api/invite",
+        "endpoint:server/coach.go:GET /api/invite/{token}",
+        "endpoint:server/coach.go:POST /api/invite/accept"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Billing: Stripe Connect Payouts",
+      "description": "The marketplace only works if coaches get paid, and billing.go is the Stripe Connect backend that closes the loop from Step 4. A coach onboards for payouts through POST /api/billing/connect, which creates or reuses a Stripe Express connected account, while GET /api/billing/status reports payout readiness. When a client hires a coach, POST /api/billing/hire opens a Stripe Checkout session that takes a 15% application fee for the platform. Finally, POST /hooks/stripe is an unauthenticated but signature-verified webhook that processes the checkout event and records the resulting coach-client engagement \u2014 the moment money and relationship become official.",
+      "nodeIds": [
+        "file:server/billing.go",
+        "endpoint:server/billing.go:POST /api/billing/connect",
+        "endpoint:server/billing.go:POST /api/billing/hire",
+        "endpoint:server/billing.go:POST /hooks/stripe"
+      ],
+      "languageLesson": "Stripe Connect marketplaces: the platform holds the Stripe account, coaches are Express connected accounts, and Checkout's application_fee_amount routes a cut to the platform while the rest goes to the coach. Webhooks must be signature-verified because they are the one endpoint Stripe (not your authenticated user) calls."
+    },
+    {
+      "order": 6,
+      "title": "The Buildless Frontend SPA",
+      "description": "Everything so far is server-side; app.js is the entire client. It is one buildless single-page app \u2014 a hash router with views for the exercise library, workouts, session logging, history, My Gym, the coach dashboard, find-a-coach, and the landing page \u2014 all driven by the same-origin PocketBase JS SDK. It is the wiring that calls every server route you just read: doAIPlan hits /api/ai/plan, suggestProgress hits /api/ai/progress, hireService hits /api/billing/hire, and sendInvite hits /api/invite. index.html is the shell that mounts the nav, view container, modal, and toast and loads the vendored PocketBase UMD SDK plus app.css. AGENTS.md captures the hard rules for this half: never build a server, escape DOM content, stay buildless.",
+      "nodeIds": [
+        "file:public/index.html",
+        "file:public/app.js",
+        "document:AGENTS.md"
+      ],
+      "languageLesson": "A buildless SPA ships raw JS with no bundler or transpile step \u2014 the browser loads app.js directly and a vendored UMD SDK provides the PocketBase client. A hash router (reading window.location.hash) gives client-side navigation without any server routing config."
+    },
+    {
+      "order": 7,
+      "title": "Seeding the Backend",
+      "description": "To run FitBase from scratch you first need the data model and the exercise catalog the AI coach validates against. setup_fitbase.py is a one-shot bootstrap that authenticates as the PocketBase superuser, ensures the exercises, workouts, and sessions collections exist with their schema and indexes, and seeds the exercise dataset. This is the counterpart to the ensureSchema routine from Steps 2 and 4 \u2014 together they guarantee the collections the whole app assumes are always present and populated.",
+      "nodeIds": [
+        "file:scripts/setup_fitbase.py"
+      ],
+      "languageLesson": "PocketBase exposes an admin REST API, so bootstrap tooling can be written in any language \u2014 here Python authenticates as superuser and PUT/POSTs collection schemas idempotently, making the script safe to re-run."
+    },
+    {
+      "order": 8,
+      "title": "Shipping It",
+      "description": "The capstone ties the two halves back together for production. Because FitBase is a custom binary (Step 2), you cannot just sync static files \u2014 deploy.sh cross-compiles the Go binary for linux/amd64, scp's it to the droplet, and restarts the wfc-fitbase systemd unit, then separately ships the public/ frontend into the app's pb_public. That single script is the whole operator path from source to the live fitbase.webface.cloud instance, delivering both the server routes and the SPA that calls them.",
+      "nodeIds": [
+        "file:scripts/deploy.sh"
+      ],
+      "languageLesson": "Go cross-compilation: setting GOOS=linux GOARCH=amd64 produces a single static Linux binary from any dev machine with no runtime dependencies to install on the server \u2014 deploy becomes scp-the-binary and restart-the-service."
+    }
+  ]
+}

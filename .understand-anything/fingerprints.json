@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "54611754447aba8d03786da2e53dbba816d75e90",
-  "generatedAt": "2026-07-22T02:08:12.079Z",
+  "gitCommitHash": "01072f215a8e5f2a53d5180b3bebb9347939bc19",
+  "generatedAt": "2026-07-31T21:43:13.374Z",
   "files": {
     "AGENTS.md": {
       "filePath": "AGENTS.md",
@@ -13,19 +13,39 @@
       "totalLines": 51,
       "hasStructuralAnalysis": true
     },
-    "app.css": {
-      "filePath": "app.css",
-      "contentHash": "3367dd6fe7f366a712414a67c6f96ddd648a692fe1845377cb442de25c6cd6c5",
+    "CLAUDE.md": {
+      "filePath": "CLAUDE.md",
+      "contentHash": "da6582895bb24f35d346150407c7544a3b2c91a207513821430b6792cc9976ad",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 164,
+      "totalLines": 54,
+      "hasStructuralAnalysis": true
+    },
+    "docs/DESIGN.md": {
+      "filePath": "docs/DESIGN.md",
+      "contentHash": "2ddd40f3277ae3a257846c96e034d51649ad36f52d606c50f55a906f51b52436",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 32,
+      "hasStructuralAnalysis": true
+    },
+    "public/app.css": {
+      "filePath": "public/app.css",
+      "contentHash": "1d00f8e03e633f572810ced21f54c7ff7259125f69ad3fc46a83c34f476294cc",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 273,
       "hasStructuralAnalysis": false
     },
-    "app.js": {
-      "filePath": "app.js",
-      "contentHash": "5d1f44dc9fed7139e8357870a83741539e66b72a92ec0c2b3da4c82ec221a4f5",
+    "public/app.js": {
+      "filePath": "public/app.js",
+      "contentHash": "300a185a51a78e3324156abfc7fe4d4cd0664a505a2013a8efe54df19ad7c1ca",
       "functions": [
         {
           "name": "$",
@@ -38,6 +58,14 @@
           "params": [],
           "exported": false,
           "lineCount": 2
+        },
+        {
+          "name": "icon",
+          "params": [
+            "name"
+          ],
+          "exported": false,
+          "lineCount": 1
         },
         {
           "name": "toast",
@@ -88,16 +116,32 @@
           "lineCount": 6
         },
         {
+          "name": "loadGym",
+          "params": [
+            "force"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "saveGym",
+          "params": [
+            "equipment"
+          ],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
           "name": "route",
           "params": [],
           "exported": false,
-          "lineCount": 12
+          "lineCount": 17
         },
         {
           "name": "renderAuthbox",
           "params": [],
           "exported": false,
-          "lineCount": 6
+          "lineCount": 7
         },
         {
           "name": "renderAuth",
@@ -148,7 +192,7 @@
             "e"
           ],
           "exported": false,
-          "lineCount": 17
+          "lineCount": 19
         },
         {
           "name": "signOut",
@@ -160,13 +204,19 @@
           "name": "renderLibrary",
           "params": [],
           "exported": false,
-          "lineCount": 41
+          "lineCount": 50
+        },
+        {
+          "name": "renderGym",
+          "params": [],
+          "exported": false,
+          "lineCount": 37
         },
         {
           "name": "filtered",
           "params": [],
           "exported": false,
-          "lineCount": 8
+          "lineCount": 10
         },
         {
           "name": "paintGrid",
@@ -189,13 +239,27 @@
             "editId"
           ],
           "exported": false,
-          "lineCount": 26
+          "lineCount": 30
         },
         {
           "name": "createWorkout",
           "params": [],
           "exported": false,
           "lineCount": 7
+        },
+        {
+          "name": "openAIPlan",
+          "params": [],
+          "exported": false,
+          "lineCount": 26
+        },
+        {
+          "name": "doAIPlan",
+          "params": [
+            "e"
+          ],
+          "exported": false,
+          "lineCount": 27
         },
         {
           "name": "deleteWorkout",
@@ -211,7 +275,21 @@
             "id"
           ],
           "exported": false,
-          "lineCount": 32
+          "lineCount": 33
+        },
+        {
+          "name": "suggestProgress",
+          "params": [
+            "id"
+          ],
+          "exported": false,
+          "lineCount": 39
+        },
+        {
+          "name": "applyProgress",
+          "params": [],
+          "exported": false,
+          "lineCount": 15
         },
         {
           "name": "getW",
@@ -344,62 +422,131 @@
           "params": [],
           "exported": false,
           "lineCount": 24
+        },
+        {
+          "name": "money",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "renderCoach",
+          "params": [],
+          "exported": false,
+          "lineCount": 55
+        },
+        {
+          "name": "createService",
+          "params": [
+            "e"
+          ],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "setupPayouts",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "toggleService",
+          "params": [
+            "id",
+            "active"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "deleteService",
+          "params": [
+            "id"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "sendInvite",
+          "params": [
+            "e"
+          ],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "viewClient",
+          "params": [
+            "clientId",
+            "label"
+          ],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "renderCoaches",
+          "params": [],
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "hireService",
+          "params": [
+            "serviceId",
+            "btn"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "renderAccept",
+          "params": [
+            "token"
+          ],
+          "exported": false,
+          "lineCount": 40
+        },
+        {
+          "name": "renderHome",
+          "params": [],
+          "exported": false,
+          "lineCount": 116
         }
       ],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 567,
+      "totalLines": 1095,
       "hasStructuralAnalysis": true
     },
-    "CLAUDE.md": {
-      "filePath": "CLAUDE.md",
-      "contentHash": "2c9333d96bf92610fe0c5fbf48421ab2157bc5d4c352bc662ede40a2de661d41",
+    "public/index.html": {
+      "filePath": "public/index.html",
+      "contentHash": "c72cd09acbbe91f769030db10813d7487d21925f6a1a77393f65f4bb0a062702",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 51,
-      "hasStructuralAnalysis": true
-    },
-    "docs/DESIGN.md": {
-      "filePath": "docs/DESIGN.md",
-      "contentHash": "2ddd40f3277ae3a257846c96e034d51649ad36f52d606c50f55a906f51b52436",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "index.html": {
-      "filePath": "index.html",
-      "contentHash": "a442f584152e35121460e8c5cb925e0d1f8b53c198d8a0a4ce3a161879f68f91",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 48,
+      "totalLines": 54,
       "hasStructuralAnalysis": false
-    },
-    "pocketbase.umd.js": {
-      "filePath": "pocketbase.umd.js",
-      "contentHash": "809fb8d7ae3d7d9c2d807a8e9b456d23d3211796561974fba5772def08cc2ae8",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 3,
-      "hasStructuralAnalysis": true
     },
     "README.md": {
       "filePath": "README.md",
-      "contentHash": "1526ba145ea653a412ff5a3d9aaab81f7a6bd66b37a29a95f8e5281f9a470e40",
+      "contentHash": "a5ed2d7637c17057f8699ffcc9be0026df3f6fe7c222fe7d50810ee9de7d4026",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 32,
+      "totalLines": 82,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/deploy.sh": {
+      "filePath": "scripts/deploy.sh",
+      "contentHash": "3b62d5c4b732f95a6ff59f1410caaf34aa1046e77f85d6fd6e1488b01a9a8df5",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 40,
       "hasStructuralAnalysis": true
     },
     "scripts/setup_fitbase.py": {
@@ -464,6 +611,661 @@
         "ensure_collection"
       ],
       "totalLines": 148,
+      "hasStructuralAnalysis": true
+    },
+    "server/ai.go": {
+      "filePath": "server/ai.go",
+      "contentHash": "a4d22caa449b92c8a665912cabf10e55961ad2232bfb18dae34da12287da5731",
+      "functions": [
+        {
+          "name": "resolvePlan",
+          "params": [
+            "user"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "modelForPlan",
+          "params": [
+            "plan"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "envOr",
+          "params": [
+            "k",
+            "def"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "selectCandidates",
+          "params": [
+            "app",
+            "equipment"
+          ],
+          "returnType": "([]candidate, error)",
+          "exported": false,
+          "lineCount": 44
+        },
+        {
+          "name": "callClaudeJSON",
+          "params": [
+            "model",
+            "system",
+            "user",
+            "schema"
+          ],
+          "returnType": "(string, error)",
+          "exported": false,
+          "lineCount": 52
+        },
+        {
+          "name": "tailStr",
+          "params": [
+            "s",
+            "n"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "extractJSON",
+          "params": [
+            "s"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "handleAIPlan",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 133
+        },
+        {
+          "name": "handleAIProgress",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 128
+        },
+        {
+          "name": "emptyDash",
+          "params": [
+            "s"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "jsonStrings",
+          "params": [
+            "v"
+          ],
+          "returnType": "[]string",
+          "exported": false,
+          "lineCount": 25
+        }
+      ],
+      "classes": [
+        {
+          "name": "candidate",
+          "methods": [],
+          "properties": [
+            "ID",
+            "ExID",
+            "Name",
+            "Target",
+            "Category",
+            "Equipment"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "planReq",
+          "methods": [],
+          "properties": [
+            "Goal",
+            "DaysPerWeek",
+            "Experience",
+            "Injuries",
+            "SessionMinutes"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "planItem",
+          "methods": [],
+          "properties": [
+            "ExID",
+            "Sets",
+            "Reps",
+            "Rationale"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "planWorkout",
+          "methods": [],
+          "properties": [
+            "Name",
+            "DayLabel",
+            "Items"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "planOut",
+          "methods": [],
+          "properties": [
+            "Workouts"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "progressItem",
+          "methods": [],
+          "properties": [
+            "ExID",
+            "NextSets",
+            "NextReps",
+            "SuggestedWeight",
+            "Note"
+          ],
+          "exported": false,
+          "lineCount": 7
+        }
+      ],
+      "imports": [
+        {
+          "source": "bytes",
+          "specifiers": [
+            "bytes"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "io",
+          "specifiers": [
+            "io"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "sort",
+          "specifiers": [
+            "sort"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/dbx",
+          "specifiers": [
+            "dbx"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/core",
+          "specifiers": [
+            "core"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 575,
+      "hasStructuralAnalysis": true
+    },
+    "server/billing.go": {
+      "filePath": "server/billing.go",
+      "contentHash": "544e4a30f46002b104502fb7db8a9feed2425b909e52f698150eae28a9296afb",
+      "functions": [
+        {
+          "name": "feeBps",
+          "params": [],
+          "returnType": "int",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "stripeForm",
+          "params": [
+            "path",
+            "form"
+          ],
+          "returnType": "(map[string]any, error)",
+          "exported": false,
+          "lineCount": 27
+        },
+        {
+          "name": "handleBillingConnect",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 38
+        },
+        {
+          "name": "handleBillingStatus",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "handleBillingHire",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 62
+        },
+        {
+          "name": "handleStripeWebhook",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 63
+        },
+        {
+          "name": "linkEngagement",
+          "params": [
+            "app",
+            "coachID",
+            "clientID",
+            "svcID",
+            "sessID",
+            "subID"
+          ],
+          "exported": false,
+          "lineCount": 36
+        },
+        {
+          "name": "verifyStripeSig",
+          "params": [
+            "payload",
+            "header",
+            "secret"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 35
+        },
+        {
+          "name": "absInt64",
+          "params": [
+            "x"
+          ],
+          "returnType": "int64",
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "crypto/hmac",
+          "specifiers": [
+            "hmac"
+          ]
+        },
+        {
+          "source": "crypto/sha256",
+          "specifiers": [
+            "sha256"
+          ]
+        },
+        {
+          "source": "encoding/hex",
+          "specifiers": [
+            "hex"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "io",
+          "specifiers": [
+            "io"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/url",
+          "specifiers": [
+            "url"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "strconv",
+          "specifiers": [
+            "strconv"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/dbx",
+          "specifiers": [
+            "dbx"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/core",
+          "specifiers": [
+            "core"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 322,
+      "hasStructuralAnalysis": true
+    },
+    "server/coach.go": {
+      "filePath": "server/coach.go",
+      "contentHash": "77315c081ceb574bf44019b80543d854fbbd127f8f77c6e3e9ab58012502597e",
+      "functions": [
+        {
+          "name": "ensureSchema",
+          "params": [
+            "app"
+          ],
+          "exported": false,
+          "lineCount": 32
+        },
+        {
+          "name": "randToken",
+          "params": [],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "appBaseURL",
+          "params": [
+            "app"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "displayName",
+          "params": [
+            "u"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "handleInviteCreate",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 59
+        },
+        {
+          "name": "handleInviteInfo",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 22
+        },
+        {
+          "name": "handleInviteAccept",
+          "params": [
+            "app"
+          ],
+          "returnType": "func(*core.RequestEvent) error",
+          "exported": false,
+          "lineCount": 50
+        },
+        {
+          "name": "htmlEsc",
+          "params": [
+            "s"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 4
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "crypto/rand",
+          "specifiers": [
+            "rand"
+          ]
+        },
+        {
+          "source": "encoding/hex",
+          "specifiers": [
+            "hex"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/mail",
+          "specifiers": [
+            "mail"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/dbx",
+          "specifiers": [
+            "dbx"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/core",
+          "specifiers": [
+            "core"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/tools/mailer",
+          "specifiers": [
+            "mailer"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 220,
+      "hasStructuralAnalysis": true
+    },
+    "server/go.mod": {
+      "filePath": "server/go.mod",
+      "contentHash": "af6ba020da20530e1c966bf9b1eaa01c96f7e6a00c1564175f856865962c4dcd",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "server/main.go": {
+      "filePath": "server/main.go",
+      "contentHash": "7328bda220aaedfcd381b75198dd274c8f457c9332d252e2fd1db48f386dfa32",
+      "functions": [
+        {
+          "name": "main",
+          "params": [],
+          "exported": false,
+          "lineCount": 57
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "log",
+          "specifiers": [
+            "log"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase",
+          "specifiers": [
+            "pocketbase"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/apis",
+          "specifiers": [
+            "apis"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/core",
+          "specifiers": [
+            "core"
+          ]
+        },
+        {
+          "source": "github.com/pocketbase/pocketbase/plugins/migratecmd",
+          "specifiers": [
+            "migratecmd"
+          ]
+        },
+        {
+          "source": "webface.cloud/platform/pbbrand",
+          "specifiers": [
+            "pbbrand"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 80,
       "hasStructuralAnalysis": true
     }
   }
