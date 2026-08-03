@@ -977,7 +977,7 @@ function renderHome() {
   if (me()) { location.hash = '#/library'; return; }
   const shot = (src, alt) => `<div class="shotframe hero-shot">
     <div class="sfbar"><span class="sfdot"></span><span class="sfdot"></span><span class="sfdot"></span>
-      <span class="sfurl">fitbase.webface.cloud</span></div>
+      <span class="sfurl">fitbase.ca</span></div>
     <img loading="lazy" src="${src}" alt="${alt}"></div>`;
   view.innerHTML = `
     <section class="hero">
