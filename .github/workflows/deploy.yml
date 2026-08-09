@@ -54,3 +54,32 @@ jobs:
       - name: Build & deploy
         working-directory: fitbase
         run: bash scripts/deploy.sh
+
+      # Tell the control plane this deploy happened.
+      #
+      # These pipelines scp a binary and restart a systemd unit directly, which
+      # bypasses the platform entirely — so before this step webface.cloud had
+      # NO record that the app had ever been deployed: the events feed showed
+      # nothing and the apps table's "last deployed" column stayed blank (book)
+      # or two weeks stale (fitbase). The endpoint exists precisely for external
+      # CI (see web/api.go apiLogEvent); nothing was calling it.
+      #
+      # Non-fatal on purpose: a reporting failure must never fail, or roll back,
+      # an otherwise healthy deploy. If WFC_API_TOKEN is unset this is a no-op.
+      - name: Report deploy to webface.cloud
+        if: success()
+        env:
+          WFC_API_TOKEN: ${{ secrets.WFC_API_TOKEN }}
+          WFC_APP_ID: ud7mn51oaq0u0h6
+        run: |
+          if [ -z "$WFC_API_TOKEN" ]; then
+            echo "WFC_API_TOKEN not set — skipping deploy report (add it in repo secrets)"
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/wfc_report.txt -w '%{http_code}' --max-time 20 \
+            -X POST "https://webface.cloud/api/platform/apps/$WFC_APP_ID/events" \
+            -H "Authorization: Bearer $WFC_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"git_deploy_ok\",\"message\":\"fitbase deployed from CI ($GITHUB_SHA)\"}") || true
+          echo "report HTTP $code"; cat /tmp/wfc_report.txt 2>/dev/null || true
+          [ "$code" = "201" ] || echo "deploy report failed (non-fatal)"
