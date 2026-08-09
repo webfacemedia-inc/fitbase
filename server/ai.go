@@ -13,6 +13,8 @@ import (
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
+
+	"webface.cloud/platform/pbbrand"
 )
 
 // resolvePlan is the single authority for a user's tier. Comp (owner) accounts
@@ -61,25 +63,76 @@ type candidate struct {
 	ID, ExID, Name, Target, Category, Equipment string
 }
 
-// selectCandidates returns owned-equipment exercises with a spread across
-// target muscles, capped so the prompt stays cheap. Grounding the model in real
-// ex_ids is what keeps generated plans valid.
-func selectCandidates(app core.App, equipment []string) ([]candidate, error) {
-	if len(equipment) == 0 {
-		return nil, nil
-	}
-	// filter: equipment = {:e0} || equipment = {:e1} ...
+const (
+	// candidateFetchCap bounds the DB read. It must exceed the seeded catalogue
+	// (1,324 exercises) so the pool is never truncated before selection.
+	//
+	// This was 800 with sort "name". A gym owning enough equipment to match
+	// more than 800 rows silently lost everything alphabetically after the
+	// cutoff — so the diversity spread below drew from an A–S subset and the
+	// model was never offered a Triceps Pushdown or an Upright Row. Alphabetical
+	// truncation is invisible in the output: you get a plausible plan built
+	// from half the catalogue.
+	candidateFetchCap = 2000
+
+	// promptCandidates is the number sent to the model. This cap is a real
+	// cost decision (each line is ~20 tokens) and stays.
+	promptCandidates = 150
+
+	// perTargetRounds bounds how many exercises one muscle group can contribute
+	// before others get a turn.
+	perTargetRounds = 8
+
+	// goalRelevantShare is how much of the prompt budget BM25-ranked,
+	// goal-relevant exercises may claim. The rest stays with the diversity
+	// spread — a plan built ONLY from "shoulders" hits is a worse plan, so
+	// relevance supplements balance rather than replacing it.
+	goalRelevantShare = 0.4
+)
+
+// equipmentFilter builds the owned-equipment predicate shared by both paths.
+func equipmentFilter(equipment []string, col string) (string, dbx.Params) {
 	parts := make([]string, len(equipment))
 	params := dbx.Params{}
 	for i, e := range equipment {
 		key := fmt.Sprintf("e%d", i)
-		parts[i] = "equipment = {:" + key + "}"
+		parts[i] = col + " = {:" + key + "}"
 		params[key] = e
 	}
-	recs, err := app.FindRecordsByFilter("exercises", strings.Join(parts, " || "), "name", 800, 0, params)
+	return strings.Join(parts, " || "), params
+}
+
+// selectCandidates returns owned-equipment exercises the model may prescribe.
+//
+// Two concerns, in order:
+//
+//  1. RELEVANCE — if FTS5 search is enabled and the user stated a goal
+//     ("upper body hypertrophy, focus on shoulders"), BM25-rank the catalogue
+//     against that text and put the best matches in first. Without this the
+//     goal never influenced WHICH exercises the model could choose from; it
+//     only ever saw an equipment-filtered, alphabetically-biased sample and had
+//     to do all the interpreting itself.
+//  2. BALANCE — fill the rest by round-robin across target muscles, so a
+//     goal-shaped prompt still contains enough of the body to build a week.
+//
+// Grounding the model in real ex_ids is what keeps generated plans valid, so
+// both paths return records that actually exist.
+//
+// Degrades cleanly: WFC_SEARCH_ENABLED is OFF by default and the exercises
+// index may not exist, so a search failure is never fatal — it falls back to
+// the equipment-only behaviour that shipped before.
+func selectCandidates(app core.App, equipment []string, goal string) ([]candidate, error) {
+	if len(equipment) == 0 {
+		return nil, nil
+	}
+
+	filter, params := equipmentFilter(equipment, "equipment")
+	recs, err := app.FindRecordsByFilter("exercises", filter, "name", candidateFetchCap, 0, params)
 	if err != nil {
 		return nil, err
 	}
+
+	byID := map[string]candidate{}
 	byTarget := map[string][]candidate{}
 	order := []string{}
 	for _, r := range recs {
@@ -88,25 +141,78 @@ func selectCandidates(app core.App, equipment []string) ([]candidate, error) {
 			Target: r.GetString("target"), Category: r.GetString("category"),
 			Equipment: r.GetString("equipment"),
 		}
+		byID[c.ID] = c
 		if _, ok := byTarget[c.Target]; !ok {
 			order = append(order, c.Target)
 		}
 		byTarget[c.Target] = append(byTarget[c.Target], c)
 	}
 	sort.Strings(order)
-	// round-robin up to 8 per target, cap 150 total
+
 	out := []candidate{}
-	for round := 0; round < 8 && len(out) < 150; round++ {
+	seen := map[string]bool{}
+	add := func(c candidate) bool {
+		if seen[c.ID] || len(out) >= promptCandidates {
+			return false
+		}
+		seen[c.ID] = true
+		out = append(out, c)
+		return true
+	}
+
+	// 1. Goal-relevant, BM25-ranked.
+	for _, c := range goalRankedCandidates(app, equipment, goal, byID) {
+		if len(out) >= int(promptCandidates*goalRelevantShare) {
+			break
+		}
+		add(c)
+	}
+
+	// 2. Diversity spread across targets fills the remainder.
+	for round := 0; round < perTargetRounds && len(out) < promptCandidates; round++ {
 		for _, t := range order {
 			if round < len(byTarget[t]) {
-				out = append(out, byTarget[t][round])
-				if len(out) >= 150 {
-					break
-				}
+				add(byTarget[t][round])
+			}
+			if len(out) >= promptCandidates {
+				break
 			}
 		}
 	}
 	return out, nil
+}
+
+// goalRankedCandidates BM25-ranks the owned-equipment catalogue against the
+// user's goal text. Returns nil (not an error) whenever search is unavailable —
+// the caller treats relevance as a bonus, never a requirement.
+func goalRankedCandidates(app core.App, equipment []string, goal string, byID map[string]candidate) []candidate {
+	if strings.TrimSpace(goal) == "" || !pbbrand.SearchEnabled() {
+		return nil
+	}
+	// Restrict the ranked set to equipment the user actually owns. The filter
+	// runs against the source table (aliased `src` by SearchCollection).
+	filter, params := equipmentFilter(equipment, "src.equipment")
+
+	// ANY (OR), not ALL. A goal is a sentence, not a search box: "shoulder
+	// press for delts" contains "for", which appears in no exercise, and
+	// requiring every token drops the result set to zero — verified, this was
+	// the first cut of this function returning nothing at all. With OR, BM25
+	// ranks by how much of the goal each exercise matches and noise words
+	// simply contribute nothing.
+	hits, err := pbbrand.SearchCollectionAny(app, "exercises", goal, promptCandidates, filter, params)
+	if err != nil {
+		// Index missing, search disabled mid-flight, or a malformed goal —
+		// none of which should stop someone generating a plan.
+		app.Logger().Warn("ai: goal-ranked candidates unavailable, using equipment spread only", "err", err)
+		return nil
+	}
+	out := make([]candidate, 0, len(hits))
+	for _, h := range hits {
+		if c, ok := byID[h.ID]; ok {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // ---- Claude call (raw Messages API; key stays server-side) ----
@@ -273,7 +379,10 @@ func handleAIPlan(app core.App) func(*core.RequestEvent) error {
 			return e.BadRequestError("Your gym has no equipment yet — add some in My Gym.", nil)
 		}
 
-		cands, err := selectCandidates(app, equipment)
+		// Goal + injuries steer WHICH exercises the model may choose from, not
+		// just how it uses them. Injuries are included so "bad shoulder" biases
+		// retrieval toward what it mentions; the model still does the excluding.
+		cands, err := selectCandidates(app, equipment, body.Goal+" "+body.Injuries)
 		if err != nil {
 			return e.InternalServerError("could not load exercises", err)
 		}

@@ -51,3 +51,51 @@ const pb = new PocketBase('/');
 await pb.collection('users').authWithPassword(email, password);
 await pb.send('/api/ai/plan', { method: 'POST', body: { goal, days_per_week, experience } });
 ```
+
+## Search (FTS5) — wired into the AI coach (2026-08-08)
+
+`exercises` is indexed upstream in `searchedCollections`
+(`webface-cloud/pbbrand/search.go`): name 10, target 6, body_part 5,
+muscle_group 5, equipment 4, category 3. **To activate on the droplet set
+`WFC_SEARCH_ENABLED=1` in `/srv/platform/apps/fitbase/app.env`** — it is OFF by
+default fleet-wide because the module runs DDL.
+
+**The payoff is NOT the search box — it is `selectCandidates` in `server/ai.go`.**
+The library filter is client-side over a 1,324-row array already in memory;
+FTS5 cannot make that faster. What FTS5 fixes is *which exercises the model is
+allowed to prescribe*: BM25 ranks the catalogue against the user's goal text,
+so "shoulder press for delts" surfaces shoulder work instead of an
+equipment-filtered alphabetical sample. Measured on a 300-exercise fixture:
+**8 relevant candidates → 43**, with leg work retained for balance.
+
+**Search is a bonus, never a dependency.** `WFC_SEARCH_ENABLED` is off by
+default and the index may not exist, so `goalRankedCandidates` returns nil on
+any failure and the equipment + diversity spread carries the plan.
+`TestWorksWithSearchDisabled` and `TestSearchIndexFailureIsNotFatal` hold that
+line — do not let plan generation start depending on FTS5.
+
+**Use `SearchCollectionAny` (OR), not `SearchCollection` (AND), for goal text.**
+A goal is prose, not a search box: "shoulder press **for** delts" contains a
+word in no exercise, and ANDing every token drops the result set to **zero**.
+The first cut of this code did exactly that and silently returned nothing while
+every test still passed — the tests now assert the goal *changes* the result,
+which is the only assertion that catches it.
+
+### Two adjacent fixes shipped at the same time
+
+- **Candidate truncation (real bug).** The fetch was `sort:"name" limit:800`
+  against a 1,324-row catalogue, so every exercise sorting after the cutoff was
+  invisible to the coach — on a 900-row fixture the model saw only `deltoids`
+  and `quadriceps`, and **could never prescribe a triceps movement**.
+  Alphabetical truncation is silent: you still get a plausible plan, built from
+  a truncated catalogue. Now `candidateFetchCap = 2000`; `promptCandidates`
+  (150) remains the deliberate prompt-cost cap.
+  Regression test: `TestLateAlphabetExercisesAreReachable`.
+- **Library search box** (`public/app.js`). Was
+  `name.includes(q) || target.includes(q)` — 2 of 6 text fields, substring not
+  token. So "press bench" found nothing, and "chest", "shoulders", "legs" and
+  "upper arms" found nothing at all. Now token-based across all six fields, and
+  `loadCatalog` fetches `body_part` + `muscle_group` (it previously did not, so
+  they were unsearchable even in principle). Still no `steps`/`secondary_muscles`
+  — large JSON, detail view only. Deliberately not ranked: the match set was
+  the gap, ordering would be polish.

@@ -64,7 +64,11 @@ async function loadCatalog() {
   if (state.catalog) return state.catalog;
   state.catalog = await pb.collection('exercises').getFullList({
     batch: 500, sort: 'name',
-    fields: 'id,ex_id,name,category,equipment,target,image',
+    // body_part + muscle_group are fetched so search can match them — without
+    // them the filter silently cannot find "quads" or "upper arms", which is
+    // exactly how the old 2-field search lost most of its recall. Still no
+    // `steps`/`secondary_muscles` (large JSON blobs, detail view only).
+    fields: 'id,ex_id,name,category,equipment,target,body_part,muscle_group,image',
   });
   return state.catalog;
 }
@@ -355,11 +359,36 @@ async function renderGym() {
   });
 }
 
+// Searchable text per exercise, built once and cached on the record.
+//
+// Was: `name.includes(q) || target.includes(q)` — 2 of the 6 text fields, and
+// substring rather than token. So "dumbbell" found nothing unless it happened
+// to be in the name, and "press bench" found nothing at all because it is not
+// a contiguous substring of "Barbell Bench Press".
+function haystack(x) {
+  if (x._hay === undefined) {
+    x._hay = [x.name, x.target, x.body_part, x.muscle_group, x.equipment, x.category]
+      .filter(Boolean).join(' ').toLowerCase();
+  }
+  return x._hay;
+}
+
+// Every token must appear somewhere, in any order and any field. This is the
+// client-side stand-in for what FTS5 does server-side: token matching rather
+// than substring. Ranking is deliberately NOT attempted here — the catalogue
+// is a fixed 1,324 rows filtered in memory, so ordering by relevance would be
+// polish; correctness of the match set is the actual gap.
+function matchesQuery(x, tokens) {
+  if (!tokens.length) return true;
+  const hay = haystack(x);
+  return tokens.every(t => hay.includes(t));
+}
+
 function filtered() {
-  const q = state.q.trim().toLowerCase();
+  const tokens = state.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const owned = state.ownedOnly && state.gym?.equipment?.length ? new Set(state.gym.equipment) : null;
   return state.catalog.filter(x =>
-    (!q || x.name.toLowerCase().includes(q) || x.target.toLowerCase().includes(q)) &&
+    matchesQuery(x, tokens) &&
     (!state.cat || x.category === state.cat) &&
     (!state.equip || x.equipment === state.equip) &&
     (!state.target || x.target === state.target) &&
