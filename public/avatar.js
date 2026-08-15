@@ -1,12 +1,22 @@
-/* FitBase 3D avatar — stylized athletic mannequin used as an interactive menu.
-   Procedural (no model file): every body region is its own named mesh group so
-   raycast picking maps 1:1 onto the catalog's `body_part` values. Loaded lazily
-   from app.js via dynamic import; Three.js is vendored (versioned filename, so
-   the import specifier below never needs cache-busting). */
+/* FitBase 3D avatar — a real sculpted muscular body used as an interactive menu.
+   Mesh: "Male base muscular anatomy" by Harshit Prajapati (CC-BY-4.0), prepped by
+   scripts/prep-avatar.mjs into figure units (y-up, feet y=0, height 3.0).
+   Regions are segmented per-vertex at load; hover/selection glow is a shader
+   patch (per-vertex region id → interpolated glow weight → mint emissive).
+   Loaded lazily from app.js via dynamic import; the top-level await below means
+   a failed mesh fetch rejects that import and app.js falls back to no-3D. */
 import * as THREE from './vendor/three-0.185.1.min.js';
+import { GLTFLoader } from './vendor/GLTFLoader-0.185.1.js';
 
 const ACCENT = 0x2dd4a7;
 const BODY = 0x1a1f2a;
+
+/* region ids — order shared by segmentation, shader uniforms, and picking */
+const REGION_INDEX = {
+  neck: 0, shoulders: 1, chest: 2, back: 3, waist: 4,
+  upperArms: 5, lowerArms: 6, upperLegs: 7, lowerLegs: 8,
+};
+const REGION_BY_INDEX = Object.keys(REGION_INDEX);
 
 /* ---------- support probe ---------- */
 
@@ -20,12 +30,80 @@ export function isSupported() {
   return _supported;
 }
 
+/* ---------- segmentation ----------
+   Classifies each vertex into a body_part region from its position in figure
+   units. The source is a T-pose (arms straight out along ±x, armspan 3.38).
+   Tuned against this specific mesh via the debug mode below. */
+
+const SEG = {
+  ARM_X: 0.52,      // |x| beyond this (in the arm band) = arm
+  ARM_YMIN: 2.05,   // arms are horizontal at shoulder height in T-pose
+  ELBOW_X: 1.05,    // |x| where the forearm starts
+  DELT_X: 0.30,     // delts/outer traps start here…
+  DELT_YMIN: 2.28,  // …above this height
+  NECK_Y: 2.62,
+  WAIST_TOP: 2.02,  // chest/back above, waist below
+  WAIST_BOT: 1.55,
+  KNEE_Y: 0.85,
+};
+
+function classifyVertex(x, y, z) {
+  const ax = Math.abs(x);
+  if (y > SEG.ARM_YMIN && ax > SEG.ARM_X)
+    return ax < SEG.ELBOW_X ? REGION_INDEX.upperArms : REGION_INDEX.lowerArms;
+  if (y >= SEG.DELT_YMIN && ax >= SEG.DELT_X) return REGION_INDEX.shoulders;
+  if (y >= SEG.NECK_Y) return REGION_INDEX.neck;
+  if (y >= SEG.WAIST_TOP) return z >= 0 ? REGION_INDEX.chest : REGION_INDEX.back;
+  if (y >= SEG.WAIST_BOT) return REGION_INDEX.waist;
+  if (y >= SEG.KNEE_Y) return REGION_INDEX.upperLegs;
+  return REGION_INDEX.lowerLegs;
+}
+
+function segmentRegions(geo) {
+  const pos = geo.getAttribute('position');
+  const arr = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++)
+    arr[i] = classifyVertex(pos.getX(i), pos.getY(i), pos.getZ(i));
+  geo.setAttribute('aRegion', new THREE.BufferAttribute(arr, 1));
+}
+
+/* ---------- mesh load (module-level: import fails ⇒ app degrades) ---------- */
+
+const bodyGeometry = await (async () => {
+  const gltf = await new GLTFLoader().loadAsync(
+    new URL('./vendor/avatar-body-1.glb', import.meta.url).href);
+  let geo = null;
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse(o => {
+    if (o.isMesh && !geo) { o.geometry.applyMatrix4(o.matrixWorld); geo = o.geometry; }
+  });
+  if (!geo) throw new Error('avatar body mesh missing from glb');
+  // belt & braces: re-normalize if the prep pipeline slipped
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox, h = bb.max.y - bb.min.y;
+  if (h < 2.9 || h > 3.1) {
+    geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
+    geo.scale(3 / h, 3 / h, 3 / h);
+    geo.computeBoundingBox();
+  }
+  // regions are baked by scripts/prep-avatar.mjs in T-pose space (exact);
+  // the runtime classifier is only a fallback for an un-baked mesh
+  const baked = geo.getAttribute('_REGION') || geo.getAttribute('_region');
+  if (baked) geo.setAttribute('aRegion', baked);
+  else segmentRegions(geo);
+  // the glb ships positions only; smooth shading comes from computing vertex
+  // normals here on the welded indexed geometry (the prep tool's normals()
+  // would bake flat/faceted ones)
+  geo.computeVertexNormals();
+  return geo;
+})();
+
 /* ---------- module singleton state ---------- */
 
 let renderer = null, scene = null, camera = null, root = null;
-let regions = null;          // { id: { group, mat, baseScale } }
+let bodyMesh = null, bodyMat = null, glowUniforms = null;
+let regions = null;          // { id: { glow, glowTarget } }
 let anchors = null;          // { name: Object3D } for nav labels
-let raycastTargets = null;   // flat mesh list for picking
 let running = false;
 
 let mounted = null;          // { container, opts, labelLayer, labelEls, ro }
@@ -37,213 +115,51 @@ let lastInteraction = 0;
 const IDLE_DELAY = 3000, IDLE_SPEED = 0.15; // rad/s
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-/* ---------- mannequin construction ----------
-   Proportions in "figure units": feet at y=0, top of head ~3.0 (≈7.5 heads).
-   The torso is two lathe segments (upper torso + waist) with the front/back
-   muscle plates embedded so the silhouette reads athletic from any angle. */
-
-function capsule(r, len, mat) {
-  return new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 16), mat);
-}
-function sphere(r, mat, sx = 1, sy = 1, sz = 1) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 18), mat);
-  m.scale.set(sx, sy, sz);
-  return m;
-}
-function taperedLimb(rTop, rBottom, len, mat) {
-  // CapsuleGeometry can't taper; cylinder + sphere caps reads as a muscle mass.
-  const g = new THREE.Group();
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBottom, len, 18), mat);
-  g.add(cyl);
-  const top = sphere(rTop, mat); top.position.y = len / 2; g.add(top);
-  const bot = sphere(rBottom, mat); bot.position.y = -len / 2; g.add(bot);
-  return g;
-}
-function lathe(profile, mat, zScale) {
-  const pts = profile.map(([y, r]) => new THREE.Vector2(r, y));
-  const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 36), mat);
-  m.scale.z = zScale;
-  return m;
-}
+/* ---------- material: dark satin + shader-patched region glow ---------- */
 
 function makeMaterial() {
-  return new THREE.MeshPhysicalMaterial({
+  const mat = new THREE.MeshPhysicalMaterial({
     color: BODY, roughness: 0.35, metalness: 0.1, clearcoat: 0.4,
-    clearcoatRoughness: 0.35, emissive: ACCENT, emissiveIntensity: 0,
+    clearcoatRoughness: 0.35, emissive: ACCENT, emissiveIntensity: 1,
   });
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uRegions = { value: new Float32Array([-1, -1, -1, -1]) };
+    shader.uniforms.uGlows = { value: new Float32Array([0, 0, 0, 0]) };
+    glowUniforms = shader.uniforms;
+    // vertex: match this vertex's region against ≤4 active regions and pass the
+    // summed weight — interpolation feathers region boundaries for free
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute float aRegion;
+        uniform float uRegions[4];
+        uniform float uGlows[4];
+        varying float vGlow;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vGlow = 0.0;
+        for (int i = 0; i < 4; i++) {
+          if (abs(aRegion - uRegions[i]) < 0.5) vGlow += uGlows[i];
+        }`);
+    // fragment: the material's emissive is full mint; scale it by the weight
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying float vGlow;`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance *= vGlow;`);
+  };
+  mat.customProgramCacheKey = () => 'fitbase-avatar-body';
+  return mat;
 }
 
-function buildMannequin() {
+/* ---------- scene ---------- */
+
+function buildFigure() {
   root = new THREE.Group();
   regions = {};
-  raycastTargets = [];
+  for (const id of REGION_BY_INDEX) regions[id] = { glow: 0, glowTarget: 0 };
 
-  const region = (id) => {
-    const mat = makeMaterial();
-    const group = new THREE.Group();
-    group.userData.region = id;
-    regions[id] = { group, mat, glow: 0, glowTarget: 0 };
-    root.add(group);
-    return { group, mat };
-  };
-  const pick = (group, mesh, regionId) => {
-    mesh.traverse ? mesh.traverse(o => { if (o.isMesh) { o.userData.region = regionId; raycastTargets.push(o); } })
-                  : null;
-    if (mesh.isMesh) { mesh.userData.region = regionId; raycastTargets.push(mesh); }
-    group.add(mesh);
-  };
-  const mirror = (group, make, regionId) => {
-    for (const side of [1, -1]) {
-      const m = make(side);
-      pick(group, m, regionId);
-    }
-  };
-
-  /* upper torso — non-pickable core; hits resolve to chest/back/waist by
-     local position (see resolveRegion). Own neutral material so region glow
-     never lights the whole trunk. */
-  const torsoMat = makeMaterial();
-  const upperTorso = lathe([
-    [1.95, 0.265], [2.05, 0.28], [2.25, 0.33], [2.42, 0.34], [2.50, 0.27], [2.56, 0.13],
-  ], torsoMat, 0.72);
-  upperTorso.userData.region = '__torso';
-  root.add(upperTorso); raycastTargets.push(upperTorso);
-
-  /* waist — its own lathe segment so the core can glow independently */
-  {
-    const { group, mat } = region('waist');
-    const w = lathe([
-      [1.42, 0.245], [1.52, 0.275], [1.66, 0.25], [1.80, 0.218], [1.90, 0.235], [1.96, 0.262],
-    ], mat, 0.72);
-    pick(group, w, 'waist');
-    // pelvis block closes the hips
-    const pelvis = sphere(0.25, mat, 1.06, 0.58, 0.72); pelvis.position.set(0, 1.47, 0);
-    pick(group, pelvis, 'waist');
-  }
-
-  /* head + neck */
-  {
-    const { group, mat } = region('neck');
-    const head = sphere(0.178, mat, 0.9, 1.1, 0.95); head.position.y = 2.79;
-    pick(group, head, 'neck');
-    const neck = capsule(0.09, 0.14, mat); neck.position.y = 2.58;
-    pick(group, neck, 'neck');
-  }
-
-  /* delts — slightly oversized caps make the athletic silhouette */
-  {
-    const { group, mat } = region('shoulders');
-    mirror(group, side => {
-      const d = sphere(0.185, mat, 1, 0.85, 0.95);
-      d.position.set(side * 0.425, 2.435, 0);
-      return d;
-    }, 'shoulders');
-    // traps hint: small wedge from neck to delt
-    mirror(group, side => {
-      const t = sphere(0.11, mat, 1.6, 0.55, 0.7);
-      t.position.set(side * 0.22, 2.52, -0.02);
-      t.rotation.z = side * -0.25;
-      return t;
-    }, 'shoulders');
-  }
-
-  /* chest — two flat pec plates swept back around Y like real pecs, so their
-     outer edges bury into the torso where it is widest (z≈0) instead of
-     poking out of the narrow front silhouette as round nubs */
-  {
-    const { group, mat } = region('chest');
-    mirror(group, side => {
-      const p = sphere(0.155, mat, 1.25, 0.8, 0.42);
-      p.position.set(side * 0.145, 2.25, 0.1);
-      p.rotation.x = 0.18;            // lower edge forward — pec hang
-      p.rotation.y = side * 0.5;      // outer edge swept back into the body
-      return p;
-    }, 'chest');
-    // Buried plates can't carry hover/selection feedback, so the glow lives on
-    // a shell: a front-arc lathe band 6-8mm proud of the torso surface,
-    // additive mint, opacity 0 until the region is hovered or selected.
-    const shellGeo = new THREE.LatheGeometry(
-      [[2.03, 0.284], [2.08, 0.301], [2.25, 0.344], [2.4, 0.353], [2.47, 0.291]]
-        .map(([y, r]) => new THREE.Vector2(r, y)),
-      32, -1.15, 2.3);                // front arc only (±66° around +z)
-    const shellMat = new THREE.MeshBasicMaterial({
-      color: ACCENT, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    const shell = new THREE.Mesh(shellGeo, shellMat);
-    shell.scale.z = 0.72;
-    shell.userData.region = 'chest';
-    raycastTargets.push(shell);
-    group.add(shell);
-    regions.chest.shellMat = shellMat;
-  }
-
-  /* back — one broad slab, traps → lats */
-  {
-    const { group, mat } = region('back');
-    // two flat plates: traps (upper) + lats (lower, wider) — hugging the torso
-    const traps = sphere(0.17, mat, 1.35, 0.75, 0.4);
-    traps.position.set(0, 2.38, -0.12); traps.rotation.x = -0.25;
-    pick(group, traps, 'back');
-    const lats = sphere(0.2, mat, 1.5, 0.95, 0.42);
-    lats.position.set(0, 2.12, -0.115); lats.rotation.x = -0.12;
-    pick(group, lats, 'back');
-  }
-
-  /* arms — A-pose ~18°, slight elbow bend forward */
-  const armAng = 0.32;
-  {
-    const { group, mat } = region('upperArms');
-    mirror(group, side => {
-      const ua = taperedLimb(0.10, 0.082, 0.36, mat);
-      ua.position.set(side * 0.435, 2.40, 0);
-      ua.rotation.z = side * armAng;
-      // shift so the top cap sits at the shoulder joint
-      ua.translateY(-0.26);
-      return ua;
-    }, 'upperArms');
-  }
-  {
-    const { group, mat } = region('lowerArms');
-    mirror(group, side => {
-      const g2 = new THREE.Group();
-      const fa = taperedLimb(0.075, 0.058, 0.34, mat);
-      const fist = sphere(0.085, mat, 0.9, 1.05, 0.9); fist.position.y = -0.26;
-      g2.add(fa); g2.add(fist);
-      // elbow position from the upper-arm transform, embedded for a smooth joint
-      const ex = 0.435 + Math.sin(armAng) * 0.48, ey = 2.40 - Math.cos(armAng) * 0.48;
-      g2.position.set(side * ex, ey, 0.02);
-      g2.rotation.z = side * (armAng + 0.06);
-      g2.rotation.x = -0.14;             // forearms drift slightly forward
-      g2.translateY(-0.17);
-      return g2;
-    }, 'lowerArms');
-  }
-
-  /* legs */
-  {
-    const { group, mat } = region('upperLegs');
-    mirror(group, side => {
-      const q = taperedLimb(0.15, 0.105, 0.52, mat);
-      q.position.set(side * 0.175, 1.46, 0);
-      q.rotation.z = side * 0.045;
-      q.translateY(-0.31);
-      return q;
-    }, 'upperLegs');
-  }
-  {
-    const { group, mat } = region('lowerLegs');
-    mirror(group, side => {
-      const g2 = new THREE.Group();
-      const shin = taperedLimb(0.10, 0.055, 0.5, mat);
-      const calf = sphere(0.085, mat, 0.9, 1.25, 0.85); calf.position.set(0, 0.12, -0.05);
-      const foot = sphere(0.075, mat, 1.05, 0.6, 1.9); foot.position.set(0, -0.30, 0.09);
-      g2.add(shin); g2.add(calf); g2.add(foot);
-      g2.position.set(side * 0.20, 0.86, 0);
-      g2.translateY(-0.30);
-      return g2;
-    }, 'lowerLegs');
-  }
+  bodyMat = makeMaterial();
+  bodyMesh = new THREE.Mesh(bodyGeometry, bodyMat);
+  root.add(bodyMesh);
 
   /* floor: fake contact shadow + faint accent ring (no shadow maps) */
   const shadowTex = (() => {
@@ -265,17 +181,17 @@ function buildMannequin() {
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.01;
   scene.add(ring);
 
-  /* nav label anchors (world positions tracked each frame) */
+  /* nav label anchors (re-tuned for the real mesh's T-pose proportions) */
   anchors = {
-    head:      new THREE.Object3D(), // above head — rotates with body
+    head:      new THREE.Object3D(),
     shoulderR: new THREE.Object3D(),
     wristL:    new THREE.Object3D(),
     torso:     new THREE.Object3D(),
     floor:     new THREE.Object3D(), // fixed to scene, not the body
   };
-  anchors.head.position.set(0, 3.1, 0);
-  anchors.shoulderR.position.set(0.68, 2.52, 0);
-  anchors.wristL.position.set(-0.72, 1.55, 0.05);
+  anchors.head.position.set(0, 3.14, 0);
+  anchors.shoulderR.position.set(0.62, 2.56, 0);
+  anchors.wristL.position.set(-1.0, 1.5, 0.08); // A-pose wrist after the prep re-pose
   anchors.torso.position.set(0.45, 1.95, 0.15);
   for (const k of ['head', 'shoulderR', 'wristL', 'torso']) root.add(anchors[k]);
   anchors.floor.position.set(0.95, 0.14, 0.35);
@@ -284,24 +200,38 @@ function buildMannequin() {
   root.rotation.y = 0.5; // pleasing 3/4 starting pose
   rotTarget = 0.5;
   scene.add(root);
+
+  if (typeof window !== 'undefined' && window.__AVATAR_DEBUG) enableSegDebug();
 }
 
-/* torso-core hits resolve to a real region by where the ray landed */
-function resolveRegion(hit) {
-  const r = hit.object.userData.region;
-  if (r !== '__torso') return r;
-  const p = root.worldToLocal(hit.point.clone());
-  if (p.y < 1.97) return 'waist';
-  return p.z >= 0 ? 'chest' : 'back';
+/* debug: false-color the mesh by region + live threshold tuning.
+   Inert in production (only runs when window.__AVATAR_DEBUG is set). */
+function enableSegDebug() {
+  const HUES = [0x888888, 0xe6194b, 0x3cb44b, 0xffe119, 0x4363d8,
+                0xf58231, 0x911eb4, 0x46f0f0, 0xf032e6];
+  const paint = () => {
+    const region = bodyGeometry.getAttribute('aRegion');
+    const colors = new Float32Array(region.count * 3);
+    const c = new THREE.Color();
+    for (let i = 0; i < region.count; i++) {
+      c.setHex(HUES[region.getX(i)]);
+      colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+    }
+    bodyGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  };
+  paint();
+  bodyMesh.material = new THREE.MeshBasicMaterial({ vertexColors: true });
+  window.__seg = {
+    SEG,
+    repaint() { segmentRegions(bodyGeometry); paint(); kick(); },
+  };
 }
-
-/* ---------- scene setup ---------- */
 
 function buildScene() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(33, 1, 0.1, 30);
   camera.position.set(0, 1.75, 6.4);
-  camera.lookAt(0, 1.4, 0);   // center below mid-figure → figure rides high, breathing room under the ring
+  camera.lookAt(0, 1.4, 0);   // center below mid-figure → breathing room under the ring
 
   const key = new THREE.DirectionalLight(0xcfd6e4, 2.8);
   key.position.set(1.6, 3.4, 2.4);
@@ -311,7 +241,7 @@ function buildScene() {
   const rimL = new THREE.DirectionalLight(ACCENT, 2.6); rimL.position.set(-2.4, 1.6, -2.0); scene.add(rimL);
   const rimR = new THREE.DirectionalLight(ACCENT, 2.0); rimR.position.set(2.4, 1.2, -2.2); scene.add(rimR);
 
-  buildMannequin();
+  buildFigure();
 }
 
 function ensureRenderer() {
@@ -342,8 +272,12 @@ function pickAt(clientX, clientY) {
   ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
   ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
   ray.setFromCamera(ndc, camera);
-  const hits = ray.intersectObjects(raycastTargets, false);
-  return hits.length ? resolveRegion(hits[0]) : null;
+  const hits = ray.intersectObject(bodyMesh, false);
+  if (!hits.length || !hits[0].face) return null;
+  const attr = bodyGeometry.getAttribute('aRegion');
+  const { a, b, c } = hits[0].face;
+  const ra = attr.getX(a), rb = attr.getX(b), rc = attr.getX(c);
+  return REGION_BY_INDEX[(ra === rb || ra === rc) ? ra : rb];
 }
 
 function bindPointer(el) {
@@ -403,7 +337,7 @@ export function setSelected(r) {
 
 function applyGlowTargets() {
   for (const [id, reg] of Object.entries(regions)) {
-    reg.glowTarget = id === selected ? 0.45 : id === hovered ? 0.05 : 0;
+    reg.glowTarget = id === selected ? 0.55 : id === hovered ? 0.07 : 0;
   }
 }
 
@@ -426,14 +360,20 @@ function frame(now) {
   root.rotation.y += (rotTarget - root.rotation.y) * ease;
   root.rotation.x += (tiltTarget - root.rotation.x) * ease;
 
-  // per-region emissive + selection pulse
-  for (const reg of Object.values(regions)) {
+  // per-region glow → ≤4 shader uniform slots (cross-fades + hover coexist)
+  let slot = 0;
+  for (const [id, reg] of Object.entries(regions)) {
     reg.glow += (reg.glowTarget - reg.glow) * (reduceMotion.matches ? 1 : 0.12);
-    reg.mat.emissiveIntensity = reg.glow;
-    if (reg.shellMat) reg.shellMat.opacity = Math.min(1, reg.glow * 0.9);
-    const s = 1 + reg.glow * 0.036;
-    reg.group.scale.setScalar(s);
+    if (glowUniforms && reg.glow > 0.001 && slot < 4) {
+      let g = reg.glow;
+      if (id === selected && !reduceMotion.matches) g *= 1 + 0.07 * Math.sin(now / 300);
+      glowUniforms.uRegions.value[slot] = REGION_INDEX[id];
+      glowUniforms.uGlows.value[slot] = g;
+      slot++;
+    }
   }
+  if (glowUniforms)
+    for (; slot < 4; slot++) { glowUniforms.uRegions.value[slot] = -1; glowUniforms.uGlows.value[slot] = 0; }
 
   if (mounted?.opts.mode === 'nav') updateLabels();
   renderer.render(scene, camera);
