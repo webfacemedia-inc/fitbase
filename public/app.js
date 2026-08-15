@@ -72,6 +72,44 @@ overlay.addEventListener('click', e => { if (e.target === overlay) closeModal();
 
 const me = () => pb.authStore.isValid ? pb.authStore.record : null;
 
+/* ---------- steps/AI language preference ----------
+   Resolution: account field > device (localStorage) > browser auto-detect.
+   The server guards which fields a self-update may touch (see server/lang.go). */
+
+function stepsLang() {
+  const u = me();
+  if (u?.lang && LANGS[u.lang]) return u.lang;
+  const ls = localStorage.getItem('fb_lang');
+  if (ls && LANGS[ls]) return ls;
+  const nav = (navigator.language || '').slice(0, 2).toLowerCase();
+  return LANGS[nav] ? nav : 'en';
+}
+
+async function setStepsLang(lang) {
+  if (!LANGS[lang] || lang === stepsLang()) return;
+  localStorage.setItem('fb_lang', lang);
+  const u = me();
+  if (u) {
+    try {
+      await pb.collection('users').update(u.id, { lang });
+      if (me()?.lang !== lang) pb.authStore.save(pb.authStore.token, { ...me(), lang });
+    } catch { /* offline/rule issue → device-level preference still applies */ }
+  }
+  toast('Steps language saved');
+}
+
+// One-time up-sync: a signed-in account with no language yet inherits the
+// device preference (covers fresh Google accounts and pre-existing users).
+async function syncLangUp() {
+  const u = me(), ls = localStorage.getItem('fb_lang');
+  if (u && !u.lang && ls && LANGS[ls]) {
+    try {
+      await pb.collection('users').update(u.id, { lang: ls });
+      if (me()?.lang !== ls) pb.authStore.save(pb.authStore.token, { ...me(), lang: ls });
+    } catch { /* non-fatal */ }
+  }
+}
+
 function needAuth() {
   if (me()) return false;
   location.hash = '#/signin';
@@ -210,6 +248,7 @@ async function signInGoogle(btn) {
   btn.disabled = true;
   try {
     await pb.collection('users').authWithOAuth2({ provider: 'google' });
+    syncLangUp(); // fire-and-forget: adopt the device language on first sign-in
     state.workouts = null;
     const pending = sessionStorage.getItem('pendingInvite');
     if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
@@ -303,6 +342,7 @@ async function doAuth(e) {
       await pb.collection('users').create({ email, password: pass, passwordConfirm: pass });
     }
     await pb.collection('users').authWithPassword(email, pass);
+    syncLangUp(); // fire-and-forget: adopt the device language on first sign-in
     state.workouts = null;
     const pending = sessionStorage.getItem('pendingInvite');
     if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
@@ -533,7 +573,7 @@ function paintGrid() {
 }
 
 async function openDetail(id, lang) {
-  lang = lang || 'en';
+  lang = lang || stepsLang();
   let x = state.detailCache[id];
   if (!x) {
     x = await pb.collection('exercises').getOne(id);
@@ -560,7 +600,7 @@ async function openDetail(id, lang) {
     </div>
     <div style="display:flex;align-items:center">
       <h2 style="font-size:15px;text-transform:none">How to do it</h2>
-      <select class="langsel" onchange="openDetail('${esc(x.id)}', this.value)">
+      <select class="langsel" onchange="setStepsLang(this.value); openDetail('${esc(x.id)}', this.value)">
         ${Object.entries(LANGS).map(([k,v]) =>
           `<option value="${k}" ${k===lang?'selected':''}>${v}</option>`).join('')}
       </select>
@@ -1275,4 +1315,5 @@ function renderDashboard() {
 }
 
 /* ---------- boot ---------- */
+syncLangUp();
 route();

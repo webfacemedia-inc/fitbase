@@ -402,7 +402,8 @@ func handleAIPlan(app core.App) func(*core.RequestEvent) error {
 		system := "You are a strength & conditioning coach building a weekly training plan for a home-gym client. " +
 			"You MUST only prescribe exercises from the provided candidate list, referenced by their exact ex_id. " +
 			"Never invent an ex_id. Balance muscle groups across the week, respect the client's experience and any injuries, " +
-			"and choose sensible sets/reps for the goal. Keep each session within the time budget."
+			"and choose sensible sets/reps for the goal. Keep each session within the time budget." +
+			langInstruction(e.Auth)
 		user := fmt.Sprintf(
 			"Goal: %s\nDays per week: %d\nExperience: %s\nInjuries/limits: %s\nSession minutes: %d\n\n"+
 				"Candidate exercises (ex_id | name | target | equipment):\n%s\n"+
@@ -598,7 +599,8 @@ func handleAIProgress(app core.App) func(*core.RequestEvent) error {
 			"completed comfortably, hold or deload if they missed reps, and when there are no logs yet keep the same " +
 			"sets/reps and suggest a sensible starting weight. Reuse each exercise's exact ex_id. Never omit an " +
 			"exercise and never leave a field empty. suggested_weight is a short human string like \"22.5 kg\", " +
-			"\"+2.5 kg\", or \"bodyweight\"."
+			"\"+2.5 kg\", or \"bodyweight\"." +
+			langInstruction(e.Auth)
 		exIDs := make([]string, len(items))
 		for i, it := range items {
 			exIDs[i] = fmt.Sprintf("%v", it["ex_id"])
