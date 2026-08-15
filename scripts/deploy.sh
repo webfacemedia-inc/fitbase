@@ -31,7 +31,7 @@ tar czf /tmp/fb-public.tgz -C public .
 scp -q /tmp/fb-public.tgz "$DROPLET:/tmp/fb-public.tgz"
 ssh "$DROPLET" "set -e
   rm -rf /tmp/fb-new && mkdir -p /tmp/fb-new && tar xzf /tmp/fb-public.tgz -C /tmp/fb-new
-  sed -i s/__V__/$V/g /tmp/fb-new/index.html
+  find /tmp/fb-new -name '*.html' -exec sed -i s/__V__/$V/g {} +
   rm -rf '$APPDIR/pb_public.prev'; cp -a '$APPDIR/pb_public' '$APPDIR/pb_public.prev'
   rm -rf '$APPDIR'/pb_public/*; cp -a /tmp/fb-new/. '$APPDIR'/pb_public/
   chown -R wfc-fitbase:wfc-fitbase '$APPDIR/pb_public'

@@ -39,7 +39,33 @@
   <div id="authbox"></div>
 </header>
 
-<main id="view"></main>
+<main id="view">
+  <!-- Static landing content: what search engines and no-JS clients (including
+       Google's OAuth branding verifier) see. The SPA router replaces this on load. -->
+  <section class="hero">
+    <div class="home-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Home-gym coaching, rebuilt</p>
+        <h1 class="hero-h1">FitBase — your gym, your plan, a coach only when you want one.</h1>
+        <p class="hero-sub"><b>FitBase</b> is a fitness training app. It turns whatever equipment you
+          have — a rack in the garage, a few dumbbells, a building gym — into a real weekly training
+          plan, and adjusts that plan every time you log a workout. Browse a library of 1,324
+          exercises with animated demonstrations, build workouts, track your training history, and
+          get AI-generated coaching based on your goals and the equipment you actually own. When you
+          want human eyes on your form, hire a real coach at their rate through the built-in
+          marketplace — no standing appointment required.</p>
+        <p class="hero-sub">Training on FitBase is free. Sign in with your email or your Google
+          account. Coaching services are optional and paid; payments are processed by Stripe.</p>
+        <div class="hero-cta">
+          <a class="btn primary lg" href="#/signin">Start training — free</a>
+          <a class="btn lg" href="#/library">Browse the exercise library</a>
+        </div>
+        <p class="hero-note">Read our <a href="/terms/">Terms of Service</a> and
+          <a href="/privacy/">Privacy Policy</a>.</p>
+      </div>
+    </div>
+  </section>
+</main>
 
 <div id="overlay" class="hidden"></div>
 <div id="toast" class="hidden"></div>
@@ -49,9 +75,9 @@
   <span class="sep">·</span>
   <span>FitBase — a webface.cloud app</span>
   <span class="sep">·</span>
-  <a href="#/terms">Terms</a>
+  <a href="/terms/">Terms</a>
   <span class="sep">·</span>
-  <a href="#/privacy">Privacy</a>
+  <a href="/privacy/">Privacy</a>
 </footer>
 
 <script src="./app.js?v=__V__"></script>
