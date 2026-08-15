@@ -335,10 +335,15 @@ footer .sep{opacity:.5}
 @media (prefers-reduced-motion:reduce){.bm-shimmer{animation:none}}
 
 /* auth extras: Google button + separator + terms note */
+/* Google's own spec: white button, dark text, the G — the shape people recognise.
+   The old dark-on-dark version read as a disabled input (a gym owner missed it). */
 .oauth-btn{
   width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
-  padding:10px 14px;font-size:14.5px;font-weight:600;margin-top:18px;
+  padding:11px 14px;font-size:15px;font-weight:600;margin-top:18px;
+  background:#ffffff;color:#1f1f1f;border:1px solid #dadce0;border-radius:9px;
+  box-shadow:0 1px 2px rgba(0,0,0,.35);
 }
+.oauth-btn:hover{background:#f7f8f8;border-color:#c6c9ce}
 .oauth-btn svg{width:18px;height:18px;flex:none}
 .or-sep{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;margin:14px 0 2px}
 .or-sep::before,.or-sep::after{content:'';flex:1;height:1px;background:var(--line)}
