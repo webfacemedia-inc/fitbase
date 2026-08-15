@@ -147,19 +147,35 @@ function buildMannequin() {
     }, 'shoulders');
   }
 
-  /* chest — one broad connected mass hugging the torso front (two separate
-     pec spheres read as pebbles stuck on, not an athlete's chest) */
+  /* chest — two flat pec plates swept back around Y like real pecs, so their
+     outer edges bury into the torso where it is widest (z≈0) instead of
+     poking out of the narrow front silhouette as round nubs */
   {
     const { group, mat } = region('chest');
-    const chest = sphere(0.16, mat, 2.05, 0.8, 0.5);
-    chest.position.set(0, 2.26, 0.115);
-    chest.rotation.x = 0.2;                 // lower edge forward — pec hang
-    pick(group, chest, 'chest');
-    // clavicle fill so the slab flows out of the upper torso instead of ledging
-    const clav = sphere(0.135, mat, 2.2, 0.62, 0.42);
-    clav.position.set(0, 2.4, 0.075);
-    clav.rotation.x = -0.18;
-    pick(group, clav, 'chest');
+    mirror(group, side => {
+      const p = sphere(0.155, mat, 1.25, 0.8, 0.42);
+      p.position.set(side * 0.145, 2.25, 0.1);
+      p.rotation.x = 0.18;            // lower edge forward — pec hang
+      p.rotation.y = side * 0.5;      // outer edge swept back into the body
+      return p;
+    }, 'chest');
+    // Buried plates can't carry hover/selection feedback, so the glow lives on
+    // a shell: a front-arc lathe band 6-8mm proud of the torso surface,
+    // additive mint, opacity 0 until the region is hovered or selected.
+    const shellGeo = new THREE.LatheGeometry(
+      [[2.03, 0.284], [2.08, 0.301], [2.25, 0.344], [2.4, 0.353], [2.47, 0.291]]
+        .map(([y, r]) => new THREE.Vector2(r, y)),
+      32, -1.15, 2.3);                // front arc only (±66° around +z)
+    const shellMat = new THREE.MeshBasicMaterial({
+      color: ACCENT, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    });
+    const shell = new THREE.Mesh(shellGeo, shellMat);
+    shell.scale.z = 0.72;
+    shell.userData.region = 'chest';
+    raycastTargets.push(shell);
+    group.add(shell);
+    regions.chest.shellMat = shellMat;
   }
 
   /* back — one broad slab, traps → lats */
@@ -414,6 +430,7 @@ function frame(now) {
   for (const reg of Object.values(regions)) {
     reg.glow += (reg.glowTarget - reg.glow) * (reduceMotion.matches ? 1 : 0.12);
     reg.mat.emissiveIntensity = reg.glow;
+    if (reg.shellMat) reg.shellMat.opacity = Math.min(1, reg.glow * 0.9);
     const s = 1 + reg.glow * 0.036;
     reg.group.scale.setScalar(s);
   }
