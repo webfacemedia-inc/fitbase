@@ -58,6 +58,7 @@ func main() {
 		// Marketplace billing (Stripe Connect).
 		se.Router.POST("/api/billing/connect", handleBillingConnect(app)).Bind(apis.RequireAuth())
 		se.Router.GET("/api/billing/status", handleBillingStatus(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/billing/hireable", handleBillingHireable(app)) // public, cached
 		se.Router.POST("/api/billing/hire", handleBillingHire(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/hooks/stripe", handleStripeWebhook(app)) // Stripe-signed, no auth
 

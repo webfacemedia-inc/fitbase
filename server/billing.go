@@ -28,11 +28,26 @@ func feeBps() int {
 // stripeForm POSTs a form-encoded request to the Stripe API and returns the
 // parsed JSON. The secret key stays server-side (app.env).
 func stripeForm(path string, form url.Values) (map[string]any, error) {
+	return stripeCall("POST", path, form)
+}
+
+// stripeGet fetches a Stripe object (used to verify a stored connected-account
+// id still exists under the *current* key — test-mode ids die on the switch to
+// a live key, and the failure surfaced only at checkout time as a raw 500).
+func stripeGet(path string) (map[string]any, error) {
+	return stripeCall("GET", path, nil)
+}
+
+func stripeCall(method, path string, form url.Values) (map[string]any, error) {
 	key := os.Getenv("STRIPE_SECRET_KEY")
 	if key == "" {
 		return nil, fmt.Errorf("billing isn't configured yet")
 	}
-	req, _ := http.NewRequest("POST", "https://api.stripe.com/v1/"+path, strings.NewReader(form.Encode()))
+	var body io.Reader
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+	}
+	req, _ := http.NewRequest(method, "https://api.stripe.com/v1/"+path, body)
 	req.SetBasicAuth(key, "")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
@@ -64,6 +79,13 @@ func handleBillingConnect(app core.App) func(*core.RequestEvent) error {
 		}
 		u := e.Auth
 		acct := u.GetString("stripe_account_id")
+		// A stored id that no longer resolves under the current key (test-mode
+		// account after the switch to live) must not be reused — recreate it.
+		if acct != "" && !stripeAccountLive(acct) {
+			acct = ""
+			u.Set("stripe_account_id", "")
+			u.Set("payouts_ready", false)
+		}
 		if acct == "" {
 			f := url.Values{}
 			f.Set("type", "express")
@@ -93,6 +115,53 @@ func handleBillingConnect(app core.App) func(*core.RequestEvent) error {
 			return e.InternalServerError("could not create onboarding link: "+err.Error(), err)
 		}
 		return e.JSON(200, map[string]any{"url": link["url"]})
+	}
+}
+
+// stripeAccountLive reports whether a connected-account id resolves under the
+// current secret key. Wrong-mode ids (test account, live key) return 404.
+func stripeAccountLive(acct string) bool {
+	if acct == "" {
+		return false
+	}
+	_, err := stripeGet("accounts/" + acct)
+	return err == nil
+}
+
+// GET /api/billing/hireable — public: which active services can actually be
+// hired right now (coach payouts ready AND the connected account resolves under
+// the current Stripe key). Lets the marketplace show plans as previews instead
+// of dead Hire buttons. One Stripe lookup per distinct coach, memoized 5 min.
+var hireableCache struct {
+	at   time.Time
+	data map[string]bool
+}
+
+func handleBillingHireable(app core.App) func(*core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if time.Since(hireableCache.at) < 5*time.Minute && hireableCache.data != nil {
+			return e.JSON(200, map[string]any{"hireable": hireableCache.data})
+		}
+		svcs, err := app.FindAllRecords("services", dbx.HashExp{"active": true})
+		if err != nil {
+			return e.JSON(200, map[string]any{"hireable": map[string]bool{}})
+		}
+		coachOK := map[string]bool{}
+		out := map[string]bool{}
+		for _, s := range svcs {
+			cid := s.GetString("coach")
+			ok, seen := coachOK[cid]
+			if !seen {
+				ok = false
+				if coach, err := app.FindRecordById("users", cid); err == nil && coach.GetBool("payouts_ready") {
+					ok = stripeAccountLive(coach.GetString("stripe_account_id"))
+				}
+				coachOK[cid] = ok
+			}
+			out[s.Id] = ok
+		}
+		hireableCache.at, hireableCache.data = time.Now(), out
+		return e.JSON(200, map[string]any{"hireable": out})
 	}
 }
 
@@ -133,10 +202,13 @@ func handleBillingHire(app core.App) func(*core.RequestEvent) error {
 		if coach.Id == e.Auth.Id {
 			return e.BadRequestError("You can't hire your own service.", nil)
 		}
-		if !coach.GetBool("payouts_ready") {
+		acct := coach.GetString("stripe_account_id")
+		// payouts_ready may be stale (set under a previous Stripe mode); a
+		// destination that doesn't exist under the live key would otherwise fail
+		// deep inside checkout creation as an opaque 500.
+		if !coach.GetBool("payouts_ready") || acct == "" || !stripeAccountLive(acct) {
 			return e.BadRequestError("This coach hasn't finished setting up payouts yet.", nil)
 		}
-		acct := coach.GetString("stripe_account_id")
 		rate := svc.GetInt("rate")
 		if rate < 1 {
 			return e.BadRequestError("invalid service price", nil)

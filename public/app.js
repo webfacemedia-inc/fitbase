@@ -1087,17 +1087,26 @@ async function viewClient(clientId, label) {
 
 async function renderCoaches() {
   view.innerHTML = `<h1>Find a coach</h1><p class="sub">Loading…</p>`;
-  const services = await pb.collection('services').getFullList({ filter: 'active=true', sort: '-created' });
+  const [services, hireableRes] = await Promise.all([
+    pb.collection('services').getFullList({ filter: 'active=true', sort: '-created' }),
+    // which services can actually be checked out right now (coach payouts live
+    // under the current Stripe key) — the rest render as previews, not dead buttons
+    pb.send('/api/billing/hireable', { method: 'GET' }).catch(() => ({ hireable: {} })),
+  ]);
+  const hireable = hireableRes?.hireable || {};
   view.innerHTML = `
     <h1>Find a coach</h1>
     <p class="sub">Hire a coach for personalized programming, form review, or nutrition — you keep training in your own gym.</p>
     <div class="wlist">
       ${services.map(s => {
+        const ok = !!hireable[s.id];
         return `<div class="wrow">
           <div class="grow"><div class="nm">${esc(s.title)}</div>
             <div class="mt">${esc(s.coach_name || 'Coach')} · ${esc(s.kind)} · ${esc(s.description||'')}</div></div>
           <div style="text-align:right"><div class="nm">${money(s.rate)}</div><div class="mt">${s.cadence==='monthly'?'/mo':'one-off'}</div></div>
-          <button class="btn sm primary" onclick="hireService('${esc(s.id)}',this)">Hire</button>
+          ${ok
+            ? `<button class="btn sm primary" onclick="hireService('${esc(s.id)}',this)">Hire</button>`
+            : `<span class="chip" title="This coach is finishing payout setup — bookings open soon">Coming soon</span>`}
         </div>`;
       }).join('') || `<p class="empty">No coaches offering services yet.</p>`}
     </div>`;
@@ -1128,7 +1137,12 @@ async function hireService(serviceId, btn) {
     });
     if (r.url) { location.href = r.url; return; }
     toast('Could not start checkout.');
-  } catch (err) { toast(err?.data?.message || 'Could not start checkout.'); }
+  } catch (err) {
+    // the server's 400s are user-facing ("coach hasn't finished setting up
+    // payouts"); anything else is ours to own, not the user's to decode
+    toast(err?.status === 400 && err?.data?.message ? err.data.message
+      : 'Checkout is unavailable right now — please try again shortly.');
+  }
   if (btn) { btn.disabled = false; btn.textContent = 'Hire'; }
 }
 
