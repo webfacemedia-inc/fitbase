@@ -8,6 +8,24 @@ const LANGS = { en:'English', es:'Español', it:'Italiano', tr:'Türkçe', ru:'�
                 zh:'中文', hi:'हिन्दी', pl:'Polski', ko:'한국어', fr:'Français' };
 const PAGE = 36;
 
+/* 3D body-map avatar — a lazy ES-module island (avatar.js + vendored three.js).
+   ASSET_V comes from this script's own ?v= tag so avatar.js cache-busts per
+   deploy; the three.js vendor file is versioned by filename and needs none. */
+const ASSET_V = (() => {
+  try { return new URL(document.currentScript.src).searchParams.get('v') || 'dev'; }
+  catch { return 'dev'; }
+})();
+let avatarModP = null, avatarMod = null;
+const loadAvatar = () => (avatarModP ||= import(`./avatar.js?v=${ASSET_V}`).then(m => (avatarMod = m)));
+// avatar region → exercises.body_part (verified against the live catalog).
+// 'cardio' is the one body_part with no body region — chips/search cover it.
+const BP_MAP = {
+  neck: 'neck', shoulders: 'shoulders', chest: 'chest', back: 'back', waist: 'waist',
+  upperArms: 'upper arms', lowerArms: 'lower arms',
+  upperLegs: 'upper legs', lowerLegs: 'lower legs',
+};
+const REGION_BY_BP = Object.fromEntries(Object.entries(BP_MAP).map(([r, b]) => [b, r]));
+
 const $ = s => document.querySelector(s);
 const view = $('#view'), overlay = $('#overlay');
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
@@ -15,7 +33,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,
 
 const state = {
   catalog: null,          // light list of all exercises
-  q: '', cat: '', equip: '', target: '', page: 1,
+  q: '', cat: '', equip: '', target: '', bodyPart: '', page: 1,
   ownedOnly: false,       // filter library to My Gym equipment
   gym: null,              // { record, equipment:[...] } — the user's owned equipment
   workouts: null,
@@ -269,6 +287,11 @@ function signOut() {
 /* ---------- library ---------- */
 
 async function renderLibrary() {
+  // deep links from the home avatar (and shareable URLs): #/library?bp=upper%20arms
+  if (params.get('bp') !== null) {
+    state.bodyPart = params.get('bp');
+    state.page = 1;
+  }
   view.innerHTML = `<h1>Exercise library</h1>
     <p class="sub">Loading the catalog…</p>`;
   const all = await loadCatalog();
@@ -280,29 +303,37 @@ async function renderLibrary() {
   const equips = [...new Set(all.map(x => x.equipment))].sort();
   const targets = [...new Set(all.map(x => x.target))].sort();
   const gymCount = state.gym?.equipment?.length || 0;
+  if (state.bodyPart && !REGION_BY_BP[state.bodyPart] && state.bodyPart !== 'cardio')
+    console.warn('unknown body_part filter:', state.bodyPart);
 
   view.innerHTML = `
     <h1>Exercise library</h1>
     <p class="sub">${all.length} exercises · filter by muscle, equipment or target · media © Gym visual</p>
-    <div class="filters">
-      <input type="search" id="f-q" placeholder="Search exercises…" value="${esc(state.q)}">
-      <select id="f-equip">
-        <option value="">All equipment</option>
-        ${equips.map(x => `<option ${x===state.equip?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('')}
-      </select>
-      <select id="f-target">
-        <option value="">All targets</option>
-        ${targets.map(x => `<option ${x===state.target?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('')}
-      </select>
-      ${me() ? (gymCount
-        ? `<label class="mygym-toggle"><input type="checkbox" id="f-owned" ${state.ownedOnly?'checked':''}> Only my gym (${gymCount})</label>`
-        : `<a class="btn sm" href="#/gym">Set up My Gym →</a>`) : ''}
+    <div class="lib-head" id="lib-head">
+      <div class="bodymap-panel" id="bm-panel"><div class="bm-shimmer"></div></div>
+      <div class="lib-controls">
+        <button class="btn sm" id="bm-toggle">🧍 Filter by body map</button>
+        <div class="filters">
+          <input type="search" id="f-q" placeholder="Search exercises…" value="${esc(state.q)}">
+          <select id="f-equip">
+            <option value="">All equipment</option>
+            ${equips.map(x => `<option ${x===state.equip?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('')}
+          </select>
+          <select id="f-target">
+            <option value="">All targets</option>
+            ${targets.map(x => `<option ${x===state.target?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('')}
+          </select>
+          ${me() ? (gymCount
+            ? `<label class="mygym-toggle"><input type="checkbox" id="f-owned" ${state.ownedOnly?'checked':''}> Only my gym (${gymCount})</label>`
+            : `<a class="btn sm" href="#/gym">Set up My Gym →</a>`) : ''}
+        </div>
+        <div class="chips" id="f-cats">
+          <button class="chip ${state.cat===''?'on':''}" data-cat="">all</button>
+          ${cats.map(c => `<button class="chip ${c===state.cat?'on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
+        </div>
+        <p class="count countrow"><span id="f-count"></span><button class="chip bp hidden" id="f-bp"></button></p>
+      </div>
     </div>
-    <div class="chips" id="f-cats">
-      <button class="chip ${state.cat===''?'on':''}" data-cat="">all</button>
-      ${cats.map(c => `<button class="chip ${c===state.cat?'on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
-    </div>
-    <p class="count" id="f-count"></p>
     <div class="grid" id="f-grid"></div>
     <div class="pager" id="f-pager"></div>`;
 
@@ -316,7 +347,55 @@ async function renderLibrary() {
     document.querySelectorAll('#f-cats .chip').forEach(c => c.classList.toggle('on', c === b));
     paintGrid();
   });
+  $('#f-bp').addEventListener('click', () => {
+    state.bodyPart = ''; state.page = 1;
+    avatarMod?.setSelected(null);
+    paintGrid(); paintBpChip();
+  });
   paintGrid();
+  paintBpChip();
+  initBodyMap();
+}
+
+/* Mount the 3D body map into the library panel. Desktop: loaded in idle time
+   after the grid paints. Mobile: only when the user opens the toggle, so the
+   three.js payload is never fetched on phones unless asked for. */
+function initBodyMap() {
+  const panel = $('#bm-panel');
+  const mountIt = async () => {
+    await loadAvatar();
+    if (document.body.dataset.route !== 'library' || !panel.isConnected) return;
+    if (!avatarMod.isSupported()) { $('#lib-head')?.classList.add('no3d'); return; }
+    avatarMod.mount(panel, {
+      mode: 'filter',
+      selected: REGION_BY_BP[state.bodyPart] || null,
+      onRegion: r => {
+        state.bodyPart = r ? BP_MAP[r] : '';
+        state.page = 1;
+        paintGrid(); paintBpChip();
+      },
+    });
+    panel.classList.add('ready');
+  };
+  if (matchMedia('(max-width:640px)').matches) {
+    $('#bm-toggle').addEventListener('click', () => {
+      const open = panel.classList.toggle('open');
+      if (open) mountIt().catch(() => $('#lib-head')?.classList.add('no3d'));
+    });
+  } else {
+    (window.requestIdleCallback || setTimeout)(() =>
+      mountIt().catch(() => $('#lib-head')?.classList.add('no3d')));
+  }
+}
+
+function paintBpChip() {
+  const b = $('#f-bp'); if (!b) return;
+  if (state.bodyPart) {
+    b.textContent = `body: ${state.bodyPart} ✕`;
+    b.classList.remove('hidden');
+  } else {
+    b.classList.add('hidden');
+  }
 }
 
 /* ---------- My Gym (equipment inventory) ---------- */
@@ -392,6 +471,7 @@ function filtered() {
     (!state.cat || x.category === state.cat) &&
     (!state.equip || x.equipment === state.equip) &&
     (!state.target || x.target === state.target) &&
+    (!state.bodyPart || x.body_part === state.bodyPart) &&
     (!owned || owned.has(x.equipment)));
 }
 
@@ -1003,7 +1083,7 @@ async function renderAccept(token) {
 /* ---------- landing ---------- */
 
 function renderHome() {
-  if (me()) { location.hash = '#/library'; return; }
+  if (me()) { renderDashboard(); return; }
   const shot = (src, alt) => `<div class="shotframe hero-shot">
     <div class="sfbar"><span class="sfdot"></span><span class="sfdot"></span><span class="sfdot"></span>
       <span class="sfurl">fitbase.ca</span></div>
@@ -1117,6 +1197,44 @@ function renderHome() {
       <p>Set it up in two minutes and train today.</p>
       <a class="btn primary lg" href="#/signin">Start free</a>
     </section>`;
+}
+
+/* ---------- signed-in dashboard (3D navigator) ---------- */
+
+function renderDashboard() {
+  const u = me();
+  const first = (u.name || '').split(' ')[0];
+  view.innerHTML = `
+    <section class="dash">
+      <p class="eyebrow">Your training hub</p>
+      <h1>Welcome back${first ? ', ' + esc(first) : ''}.</h1>
+      <p class="sub">Spin the figure and tap a muscle group to explore its exercises — or jump straight in below.</p>
+      <div class="dash-avatar" id="dash-avatar"></div>
+      <div class="dash-links">
+        <a class="btn" href="#/workouts">${icon('dumbbell')}Workouts</a>
+        <a class="btn" href="#/library">${icon('grid')}Library</a>
+        <a class="btn" href="#/history">${icon('clock')}History</a>
+        <a class="btn" href="#/gym">${icon('home')}My Gym</a>
+        <a class="btn" href="#/coach">${icon('sparkles')}AI Coach</a>
+        <a class="btn" href="#/coaches">${icon('users')}Find a Coach</a>
+      </div>
+    </section>`;
+  loadAvatar().then(() => {
+    const el = $('#dash-avatar');
+    if (document.body.dataset.route !== 'home' || !el?.isConnected) return;
+    if (!avatarMod.isSupported()) { el.remove(); return; } // link chips carry the screen
+    avatarMod.mount(el, {
+      mode: 'nav',
+      labels: [
+        { anchor: 'head', text: 'AI Coach', hash: '#/coach' },
+        { anchor: 'shoulderR', text: 'Workouts', hash: '#/workouts' },
+        { anchor: 'wristL', text: 'History', hash: '#/history' },
+        { anchor: 'floor', text: 'My Gym', hash: '#/gym' },
+      ],
+      onRegion: r => { location.hash = '#/library?bp=' + encodeURIComponent(BP_MAP[r]); },
+    });
+    el.classList.add('ready');
+  }).catch(() => $('#dash-avatar')?.remove());
 }
 
 /* ---------- boot ---------- */
