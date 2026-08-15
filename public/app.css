@@ -4,7 +4,7 @@
   --danger:#e05d5d; --radius:14px; --pad:22px;
 }
 *{box-sizing:border-box;margin:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:auto} /* smooth here made programmatic resets animate on iOS */
 body{
   background:var(--bg); color:var(--text);
   font:15px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif;
@@ -185,8 +185,11 @@ footer .sep{opacity:.5}
      horizontal scrolling. renderAuthbox still toggles its display per auth. */
   #nav{
     position:fixed;left:0;right:0;bottom:0;z-index:30;
-    background:rgba(10,12,16,.96);backdrop-filter:blur(8px);
+    /* solid, no backdrop-filter: on iOS Safari a filtered fixed element lags
+       behind rubber-band scrolling and drops taps until the scroll settles */
+    background:#0b0d12;
     border-top:1px solid var(--line);
+    transform:translateZ(0);
     justify-content:space-around;gap:0;
     padding:6px max(4px,env(safe-area-inset-left)) calc(7px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-right));
   }

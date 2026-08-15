@@ -64,7 +64,10 @@ func appBaseURL(app core.App) string {
 	if u := app.Settings().Meta.AppURL; u != "" {
 		return strings.TrimRight(u, "/")
 	}
-	return "https://fitbase.webface.cloud"
+	// fitbase.ca is the primary domain (og:url/canonical) — Stripe return
+	// links, invite emails, and reset links must land users there, not on the
+	// platform hostname.
+	return "https://fitbase.ca"
 }
 
 func displayName(u *core.Record) string {

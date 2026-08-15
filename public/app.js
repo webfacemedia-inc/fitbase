@@ -188,6 +188,10 @@ async function route() {
   document.body.dataset.route = name; // drives per-route layout width (see main{} in CSS)
   document.querySelectorAll('#nav a').forEach(a =>
     a.classList.toggle('active', a.dataset.route === name));
+  // Every navigation starts at the top. Instant, not smooth: a smooth scroll
+  // fights the new view's layout on iOS and leaves the page mid-scroll, which
+  // is also what made the fixed bottom tab bar feel unresponsive.
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   renderAuthbox();
   try { await routes[name](seg[1]); }
   catch (err) {
