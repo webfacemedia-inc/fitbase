@@ -96,6 +96,12 @@ func handleBillingConnect(app core.App) func(*core.RequestEvent) error {
 			f.Set("metadata[user]", u.Id)
 			out, err := stripeForm("accounts", f)
 			if err != nil {
+				// Platform-side blocker (Stripe Connect profile incomplete) — not
+				// something the coach can fix; say so plainly and log for the operator.
+				if strings.Contains(err.Error(), "platform profile") {
+					app.Logger().Error("billing: Stripe Connect platform profile incomplete — coaches cannot onboard", "err", err.Error())
+					return e.BadRequestError("Payout setup isn't open yet — we're finishing our payments setup. Check back soon.", nil)
+				}
 				return e.InternalServerError("could not start onboarding: "+err.Error(), err)
 			}
 			acct, _ = out["id"].(string)
