@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -68,6 +69,20 @@ func main() {
 					return e.Redirect(302, "/_/")
 				}
 				return e.NotFoundError("", nil)
+			}
+			// Cache policy: without explicit headers browsers heuristically cache
+			// HTML, so a deploy doesn't show until a hard refresh. HTML (and
+			// extensionless SPA/legal routes) must always revalidate; versioned
+			// vendor files are immutable; other assets are ?v=-busted per deploy.
+			p := e.Request.URL.Path
+			h := e.Response.Header()
+			switch {
+			case strings.HasPrefix(p, "/vendor/"):
+				h.Set("Cache-Control", "public, max-age=31536000, immutable")
+			case strings.HasSuffix(p, ".html") || filepath.Ext(p) == "":
+				h.Set("Cache-Control", "no-cache")
+			default:
+				h.Set("Cache-Control", "public, max-age=86400")
 			}
 			return staticHandler(e)
 		})
