@@ -1269,6 +1269,24 @@ function renderHome() {
       </div>
     </section>
 
+    <section class="band">
+      <div class="split" style="padding:0">
+        <div class="split-card">
+          <p class="kicker2">For gyms</p>
+          <h2>Run a gym? Put it in every member's pocket.</h2>
+          <p>Members get AI plans built from <b>your floor's</b> equipment, demos in ten
+            languages, and your trainers earn through the built-in marketplace.</p>
+          <a class="btn" href="/gyms/">FitBase for gyms →</a>
+        </div>
+        <div class="split-card">
+          <h2>Branded for your gym</h2>
+          <p>Optional white-label setup — your name, your logo, your domain. The platform stays
+            ours to run, the brand stays yours.</p>
+          <a class="btn" href="mailto:tommy@webfacemedia.com?subject=Branded%20FitBase%20for%20my%20gym">Ask about branding</a>
+        </div>
+      </div>
+    </section>
+
     <section class="finalcta">
       <h2>The gym you have is enough.</h2>
       <p>Set it up in two minutes and train today.</p>
