@@ -128,6 +128,36 @@ func stripeAccountLive(acct string) bool {
 	return err == nil
 }
 
+// refreshPayoutReadiness asks Stripe directly whether the coach's connected
+// account can take charges + payouts and persists the answer. The webhook
+// (account.updated) does the same thing asynchronously; reading it here on
+// dashboard load / return-from-onboarding means a coach is never stuck "not
+// ready" because a webhook was missed, misconfigured, or slow. Returns
+// (exists, ready).
+func refreshPayoutReadiness(app core.App, u *core.Record) (bool, bool) {
+	acct := u.GetString("stripe_account_id")
+	if acct == "" {
+		return false, false
+	}
+	out, err := stripeGet("accounts/" + acct)
+	if err != nil {
+		// dead/wrong-mode id: forget it so the next Set up creates a live one
+		u.Set("stripe_account_id", "")
+		u.Set("payouts_ready", false)
+		_ = app.Save(u)
+		return false, false
+	}
+	charges, _ := out["charges_enabled"].(bool)
+	payouts, _ := out["payouts_enabled"].(bool)
+	ready := charges && payouts
+	if u.GetBool("payouts_ready") != ready {
+		u.Set("payouts_ready", ready)
+		_ = app.Save(u)
+		hireableCache.at = time.Time{} // marketplace picks the change up immediately
+	}
+	return true, ready
+}
+
 // GET /api/billing/hireable — public: which active services can actually be
 // hired right now (coach payouts ready AND the connected account resolves under
 // the current Stripe key). Lets the marketplace show plans as previews instead
@@ -171,9 +201,10 @@ func handleBillingStatus(app core.App) func(*core.RequestEvent) error {
 		if e.Auth == nil {
 			return e.UnauthorizedError("sign in first", nil)
 		}
+		exists, ready := refreshPayoutReadiness(app, e.Auth)
 		return e.JSON(200, map[string]any{
-			"onboarded":     e.Auth.GetString("stripe_account_id") != "",
-			"payouts_ready": e.Auth.GetBool("payouts_ready"),
+			"onboarded":     exists,
+			"payouts_ready": ready,
 		})
 	}
 }
@@ -254,8 +285,18 @@ func handleStripeWebhook(app core.App) func(*core.RequestEvent) error {
 		if err != nil {
 			return e.BadRequestError("no body", nil)
 		}
-		secret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-		if !verifyStripeSig(payload, e.Request.Header.Get("Stripe-Signature"), secret) {
+		// Two Stripe endpoints deliver here — the platform one and the Connect one
+		// (connected-account events like account.updated) — each with its own
+		// signing secret. STRIPE_WEBHOOK_SECRET may hold several, comma-separated.
+		sig := e.Request.Header.Get("Stripe-Signature")
+		ok := false
+		for _, secret := range strings.Split(os.Getenv("STRIPE_WEBHOOK_SECRET"), ",") {
+			if verifyStripeSig(payload, sig, strings.TrimSpace(secret)) {
+				ok = true
+				break
+			}
+		}
+		if !ok {
 			return e.UnauthorizedError("bad signature", nil)
 		}
 		var evt struct {
@@ -277,6 +318,7 @@ func handleStripeWebhook(app core.App) func(*core.RequestEvent) error {
 			if u, err := app.FindFirstRecordByFilter("users", "stripe_account_id = {:a}", dbx.Params{"a": id}); err == nil {
 				u.Set("payouts_ready", charges && payouts)
 				_ = app.Save(u)
+				hireableCache.at = time.Time{} // marketplace reflects it on next load
 			}
 		case "checkout.session.completed":
 			md, _ := obj["metadata"].(map[string]any)
