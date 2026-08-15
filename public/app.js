@@ -1253,7 +1253,7 @@ function renderDashboard() {
         <a class="btn" href="#/history">${icon('clock')}History</a>
         <a class="btn" href="#/gym">${icon('home')}My Gym</a>
         <a class="btn" href="#/coach">${icon('sparkles')}AI Coach</a>
-        <a class="btn" href="#/coaches">${icon('users')}Find a Coach</a>
+        <a class="btn" href="#/coaches">${icon('users')}Coaches</a>
       </div>
     </section>`;
   loadAvatar().then(() => {

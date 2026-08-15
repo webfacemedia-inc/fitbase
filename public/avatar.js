@@ -124,7 +124,7 @@ function buildMannequin() {
   /* head + neck */
   {
     const { group, mat } = region('neck');
-    const head = sphere(0.185, mat, 0.9, 1.1, 0.95); head.position.y = 2.78;
+    const head = sphere(0.178, mat, 0.9, 1.1, 0.95); head.position.y = 2.79;
     pick(group, head, 'neck');
     const neck = capsule(0.09, 0.14, mat); neck.position.y = 2.58;
     pick(group, neck, 'neck');
@@ -134,8 +134,8 @@ function buildMannequin() {
   {
     const { group, mat } = region('shoulders');
     mirror(group, side => {
-      const d = sphere(0.175, mat, 1, 0.85, 0.95);
-      d.position.set(side * 0.415, 2.435, 0);
+      const d = sphere(0.185, mat, 1, 0.85, 0.95);
+      d.position.set(side * 0.425, 2.435, 0);
       return d;
     }, 'shoulders');
     // traps hint: small wedge from neck to delt
@@ -147,15 +147,19 @@ function buildMannequin() {
     }, 'shoulders');
   }
 
-  /* pecs — flattened plates embedded in the torso front */
+  /* chest — one broad connected mass hugging the torso front (two separate
+     pec spheres read as pebbles stuck on, not an athlete's chest) */
   {
     const { group, mat } = region('chest');
-    mirror(group, side => {
-      const p = sphere(0.15, mat, 1.18, 0.78, 0.42);
-      p.position.set(side * 0.16, 2.27, 0.135);
-      p.rotation.x = 0.15;
-      return p;
-    }, 'chest');
+    const chest = sphere(0.16, mat, 2.05, 0.8, 0.5);
+    chest.position.set(0, 2.26, 0.115);
+    chest.rotation.x = 0.2;                 // lower edge forward — pec hang
+    pick(group, chest, 'chest');
+    // clavicle fill so the slab flows out of the upper torso instead of ledging
+    const clav = sphere(0.135, mat, 2.2, 0.62, 0.42);
+    clav.position.set(0, 2.4, 0.075);
+    clav.rotation.x = -0.18;
+    pick(group, clav, 'chest');
   }
 
   /* back — one broad slab, traps → lats */
@@ -235,12 +239,12 @@ function buildMannequin() {
     return new THREE.CanvasTexture(c);
   })();
   const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(1.05, 48),
+    new THREE.CircleGeometry(0.95, 48),
     new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.005; shadow.scale.set(1, 0.8, 1);
   scene.add(shadow);
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.86, 0.885, 64),
+    new THREE.RingGeometry(0.78, 0.802, 64),
     new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.28, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.01;
   scene.add(ring);
@@ -280,8 +284,8 @@ function resolveRegion(hit) {
 function buildScene() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(33, 1, 0.1, 30);
-  camera.position.set(0, 1.8, 5.9);
-  camera.lookAt(0, 1.58, 0);
+  camera.position.set(0, 1.75, 6.4);
+  camera.lookAt(0, 1.4, 0);   // center below mid-figure → figure rides high, breathing room under the ring
 
   const key = new THREE.DirectionalLight(0xcfd6e4, 2.8);
   key.position.set(1.6, 3.4, 2.4);
@@ -301,7 +305,9 @@ function ensureRenderer() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
   renderer.domElement.className = 'avatar-canvas';
-  renderer.domElement.style.touchAction = 'none';   // canvas only — page scroll unaffected
+  // pan-y: horizontal drags rotate the figure, vertical swipes still scroll the
+  // page — a full-width canvas with touch-action:none traps mobile scrolling.
+  renderer.domElement.style.touchAction = 'pan-y';
   renderer.domElement.style.display = 'block';
   buildScene();
   bindPointer(renderer.domElement);
@@ -433,7 +439,9 @@ function updateLabels() {
     anchor.getWorldPosition(_v);
     const behind = camera.position.distanceTo(_v) > camDist + 0.18;
     _v.project(camera);
-    const x = (_v.x * 0.5 + 0.5) * rect.w, y = (-_v.y * 0.5 + 0.5) * rect.h;
+    // clamp into the container so labels never spill past the panel edges
+    const x = Math.max(34, Math.min(rect.w - 34, (_v.x * 0.5 + 0.5) * rect.w));
+    const y = Math.max(16, Math.min(rect.h - 16, (-_v.y * 0.5 + 0.5) * rect.h));
     el.style.transform = `translate(-50%,-50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;
     el.style.opacity = behind ? 0.15 : 1;
     el.style.pointerEvents = behind ? 'none' : 'auto';
@@ -475,7 +483,8 @@ export function mount(container, opts = {}) {
   const resize = () => {
     const w = container.clientWidth, h = container.clientHeight;
     if (!w || !h) return;
-    renderer.setSize(w, h, false);
+    renderer.setSize(w, h); // updateStyle=true: CSS size must track the container,
+                            // or high-DPR phones display the canvas at buffer size
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     kick();
