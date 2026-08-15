@@ -252,6 +252,7 @@ async function signInGoogle(btn) {
     state.workouts = null;
     const pending = sessionStorage.getItem('pendingInvite');
     if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
+    else if (sessionStorage.getItem('pendingHire')) location.hash = '#/coaches'; // resume interrupted hire
     else location.hash = '#/library';
     toast('Signed in with Google.');
   } catch (err) {
@@ -346,6 +347,7 @@ async function doAuth(e) {
     state.workouts = null;
     const pending = sessionStorage.getItem('pendingInvite');
     if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
+    else if (sessionStorage.getItem('pendingHire')) location.hash = '#/coaches'; // resume interrupted hire
     else location.hash = '#/library';
     toast(signupMode ? 'Account created — welcome.' : 'Signed in.');
   } catch (err) {
@@ -1100,10 +1102,24 @@ async function renderCoaches() {
       }).join('') || `<p class="empty">No coaches offering services yet.</p>`}
     </div>`;
   if (params.get('hired')) toast('Payment received — your coach can now see your training. 💪');
+  // resume a hire that was interrupted by sign-in
+  const pending = sessionStorage.getItem('pendingHire');
+  if (pending && me()) {
+    sessionStorage.removeItem('pendingHire');
+    if (services.some(s => s.id === pending)) hireService(pending);
+  }
 }
 
 async function hireService(serviceId, btn) {
-  if (!me()) { toast('Sign in to hire a coach.'); location.hash = '#/login'; return; }
+  if (!me()) {
+    // '#/login' was not a real route — unknown routes fall back to the library,
+    // which silently dumped the user mid-hire. Remember the intent and resume
+    // checkout after sign-in (renderCoaches picks pendingHire back up).
+    sessionStorage.setItem('pendingHire', serviceId);
+    toast('Sign in to hire a coach — we\'ll bring you right back.');
+    location.hash = '#/signin';
+    return;
+  }
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     const r = await pb.send('/api/billing/hire', {
