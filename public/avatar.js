@@ -9,7 +9,7 @@ import * as THREE from './vendor/three-0.185.1.min.js';
 import { GLTFLoader } from './vendor/GLTFLoader-0.185.1.js';
 
 const ACCENT = 0x2dd4a7;
-const BODY = 0x1a1f2a;
+const BODY = 0x2a3140; // lifted from #1a1f2a: form must read against a dark panel, not only the rim
 
 /* region ids — order shared by segmentation, shader uniforms, and picking */
 const REGION_INDEX = {
@@ -233,10 +233,12 @@ function buildScene() {
   camera.position.set(0, 1.75, 6.4);
   camera.lookAt(0, 1.4, 0);   // center below mid-figure → breathing room under the ring
 
-  const key = new THREE.DirectionalLight(0xcfd6e4, 2.8);
+  const key = new THREE.DirectionalLight(0xdfe5f0, 3.4);
   key.position.set(1.6, 3.4, 2.4);
   scene.add(key);
-  scene.add(new THREE.HemisphereLight(0x2a3242, 0x0a0c10, 1.3));
+  // fill from the front-left so the shadow side isn't lost in the panel
+  const fill = new THREE.DirectionalLight(0x9fb0c8, 1.1); fill.position.set(-2.2, 1.8, 2.6); scene.add(fill);
+  scene.add(new THREE.HemisphereLight(0x3a4458, 0x0f1218, 1.6));
   // the mint rims: permanent tasteful edge glow on both silhouette sides
   const rimL = new THREE.DirectionalLight(ACCENT, 2.6); rimL.position.set(-2.4, 1.6, -2.0); scene.add(rimL);
   const rimR = new THREE.DirectionalLight(ACCENT, 2.0); rimR.position.set(2.4, 1.2, -2.2); scene.add(rimR);

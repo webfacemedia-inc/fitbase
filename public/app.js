@@ -1239,12 +1239,15 @@ function renderHome() {
             form? <b>Hire a real coach at their rate</b> — no standing appointment required. You keep
             training in your own gym.</p>
           <div class="hero-cta">
-            <a class="btn primary lg" href="#/signin">Start training — free</a>
-            <a class="btn lg" href="#/library">Browse 1,324 exercises</a>
+            <a class="btn primary lg" href="#/library">Explore the 3D body map</a>
+            <a class="btn lg" href="#/signin">Start training — free</a>
           </div>
           <p class="hero-note">Free to train. Coaching is optional. Your data stays yours.</p>
         </div>
-        ${shot('/img/home-plan.jpg', 'A weekly plan built from your equipment')}
+        <div class="hero-avatar" id="hero-avatar">
+          <div class="hero-avatar-hint">Spin me · tap a muscle group to see its exercises</div>
+          ${shot('/img/home-plan.jpg', 'A weekly plan built from your equipment')}
+        </div>
       </div>
     </section>
 
@@ -1355,6 +1358,18 @@ function renderHome() {
       <p>Set it up in two minutes and train today.</p>
       <a class="btn primary lg" href="#/signin">Start free</a>
     </section>`;
+  // The eye candy IS the pitch: mount the live body map into the hero. A tap on a
+  // muscle drops the visitor into the public library filtered to it — no sign-in.
+  loadAvatar().then(() => {
+    const el = $('#hero-avatar');
+    if (document.body.dataset.route !== 'home' || !el?.isConnected || !avatarMod.isSupported()) return;
+    el.querySelector('.shotframe')?.remove(); // screenshot was the no-WebGL fallback
+    avatarMod.mount(el, {
+      mode: 'nav', labels: [],
+      onRegion: r => { track('hero_bodymap_tap', { region: r }); location.hash = '#/library?bp=' + encodeURIComponent(BP_MAP[r]); },
+    });
+    el.classList.add('ready');
+  }).catch(() => {});
 }
 
 
