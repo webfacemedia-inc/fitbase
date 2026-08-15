@@ -72,6 +72,10 @@ overlay.addEventListener('click', e => { if (e.target === overlay) closeModal();
 
 const me = () => pb.authStore.isValid ? pb.authStore.record : null;
 
+// Funnel events on the existing insights script (page views are automatic).
+// Names: signup, gym_profiled, plan_generated, session_logged, hire_clicked, share.
+const track = (name, props) => { try { window.insights?.track(name, props || {}); } catch {} };
+
 /* ---------- steps/AI language preference ----------
    Resolution: account field > device (localStorage) > browser auto-detect.
    The server guards which fields a self-update may touch (see server/lang.go). */
@@ -124,7 +128,7 @@ async function loadCatalog() {
     // them the filter silently cannot find "quads" or "upper arms", which is
     // exactly how the old 2-field search lost most of its recall. Still no
     // `steps`/`secondary_muscles` (large JSON blobs, detail view only).
-    fields: 'id,ex_id,name,category,equipment,target,body_part,muscle_group,image',
+    fields: 'id,ex_id,name,category,equipment,target,body_part,muscle_group,image,gif_url',
   });
   return state.catalog;
 }
@@ -258,6 +262,7 @@ async function signInGoogle(btn) {
     if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
     else if (sessionStorage.getItem('pendingHire')) location.hash = '#/coaches'; // resume interrupted hire
     else location.hash = '#/library';
+    track('signin', { method: 'google' });
     toast('Signed in with Google.');
   } catch (err) {
     // a closed popup is a user choice, not an error worth shouting about
@@ -353,6 +358,7 @@ async function doAuth(e) {
     if (pending) { sessionStorage.removeItem('pendingInvite'); location.hash = '#/accept/' + pending; }
     else if (sessionStorage.getItem('pendingHire')) location.hash = '#/coaches'; // resume interrupted hire
     else location.hash = '#/library';
+    track(signupMode ? 'signup' : 'signin', { method: 'password' });
     toast(signupMode ? 'Account created — welcome.' : 'Signed in.');
   } catch (err) {
     errEl.textContent = err?.data?.message || err.message || 'Failed.';
@@ -430,6 +436,13 @@ async function renderLibrary() {
     document.querySelectorAll('#f-cats .chip').forEach(c => c.classList.toggle('on', c === b));
     paintGrid();
   });
+  // Cards play the exercise animation on hover (desktop) — the still comes back on leave.
+  // Delegated once; paintGrid re-renders cards freely.
+  const grid = $('#f-grid');
+  const play = card => { const img = card?.querySelector('img'); if (img && card.dataset.gif) img.src = CDN + card.dataset.gif; };
+  const still = card => { const img = card?.querySelector('img'); if (img) img.src = img.dataset.still; };
+  grid.addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (c && !c.contains(e.relatedTarget)) play(c); });
+  grid.addEventListener('mouseout',  e => { const c = e.target.closest('.card'); if (c && !c.contains(e.relatedTarget)) still(c); });
   $('#f-bp').addEventListener('click', () => {
     state.bodyPart = ''; state.page = 1;
     avatarMod?.setSelected(null);
@@ -575,8 +588,8 @@ function paintGrid() {
   const slice = list.slice((state.page - 1) * PAGE, state.page * PAGE);
   $('#f-count').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'}`;
   $('#f-grid').innerHTML = slice.map(x => `
-    <div class="card" onclick="openDetail('${esc(x.id)}')">
-      <img loading="lazy" src="${CDN}${esc(x.image)}" alt="${esc(x.name)}">
+    <div class="card" onclick="openDetail('${esc(x.id)}')" data-gif="${esc(x.gif_url || '')}">
+      <img loading="lazy" src="${CDN}${esc(x.image)}" data-still="${CDN}${esc(x.image)}" alt="${esc(x.name)}">
       <div class="cb">
         <div class="nm">${esc(x.name)}</div>
         <div class="mt">${esc(x.target)} · ${esc(x.equipment)}</div>
@@ -631,6 +644,11 @@ async function renderWorkouts(editId) {
   if (needAuth()) return;
   if (editId) return renderWorkoutEditor(editId);
   const ws = await loadWorkouts();
+  // First run: nothing built yet and no gym profiled → the instant-plan flow, not an empty page.
+  if (!ws.length && !params.get('manual')) {
+    const eq = await loadGym();
+    if (!eq.length) return renderFirstRun();
+  }
   view.innerHTML = `
     <h1>Workouts</h1>
     <p class="sub">Build routines from the library, or let the AI coach build a week from your gym.</p>
@@ -715,6 +733,7 @@ async function doAIPlan(e) {
     await loadWorkouts(true);
     renderWorkouts();
     const n = (res.created || []).length;
+    track('plan_generated', { workouts: n });
     toast(`Created ${n} workout${n===1?'':'s'} from your gym.`);
   } catch (err2) {
     err.textContent = err2?.data?.message || err2?.message || 'Could not generate a plan.';
@@ -1149,7 +1168,7 @@ async function hireService(serviceId, btn) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ service_id: serviceId }),
     });
-    if (r.url) { location.href = r.url; return; }
+    if (r.url) { track('hire_clicked', { service: serviceId }); location.href = r.url; return; }
     toast('Could not start checkout.');
   } catch (err) {
     // the server's 400s are user-facing ("coach hasn't finished setting up
@@ -1336,6 +1355,83 @@ function renderHome() {
       <p>Set it up in two minutes and train today.</p>
       <a class="btn primary lg" href="#/signin">Start free</a>
     </section>`;
+}
+
+
+/* ---------- first run: instant plan in 30 seconds ---------- */
+
+const STARTER_FLOORS = {
+  'Home — dumbbells & bands': ['dumbbell', 'band', 'body weight'],
+  'Home — barbell rack': ['barbell', 'dumbbell', 'body weight', 'weighted'],
+  'Commercial gym floor': ['barbell', 'dumbbell', 'cable', 'leverage machine', 'smith machine', 'body weight', 'kettlebell', 'ez barbell'],
+  'Bodyweight only': ['body weight'],
+};
+
+async function renderFirstRun() {
+  const all = await loadCatalog();
+  const equips = [...new Set(all.map(x => x.equipment))].sort();
+  const first = (me().name || '').split(' ')[0];
+  view.innerHTML = `
+    <section class="firstrun">
+      <p class="eyebrow">Your first plan in 30 seconds</p>
+      <h1>${first ? `Welcome, ${esc(first)}.` : 'Welcome.'} What's on your floor?</h1>
+      <p class="sub">Tap the equipment you actually have — or start from a preset. The AI coach builds your first week from exactly that, and you can refine My Gym any time.</p>
+      <div class="chips" id="fr-presets">
+        ${Object.keys(STARTER_FLOORS).map(k => `<button class="chip preset" data-preset="${esc(k)}">${esc(k)}</button>`).join('')}
+      </div>
+      <div class="chips" id="fr-eq">
+        ${equips.map(x => `<button class="chip" data-eq="${esc(x)}">${esc(x)}</button>`).join('')}
+      </div>
+      <div class="rowbar" style="max-width:none;flex-wrap:wrap">
+        <input id="fr-goal" placeholder="Goal — e.g. build muscle, get stronger, lose fat" value="general strength" style="flex:1;min-width:220px">
+        <select id="fr-days">${[2,3,4,5].map(d=>`<option ${d===3?'selected':''}>${d}</option>`).join('')}</select>
+        <span class="count" style="margin:0">days/wk</span>
+      </div>
+      <div class="err" id="fr-err"></div>
+      <div class="rowbar" style="max-width:none">
+        <button class="btn primary lg" id="fr-go" disabled>Build my first week</button>
+        <span class="count" id="fr-count" style="margin:0">0 selected</span>
+        <a class="btn" href="#/workouts?manual=1" style="margin-left:auto">I'll build it myself</a>
+      </div>
+    </section>`;
+  const sel = new Set();
+  const paint = () => {
+    document.querySelectorAll('#fr-eq .chip').forEach(c => c.classList.toggle('on', sel.has(c.dataset.eq)));
+    $('#fr-count').textContent = `${sel.size} selected`;
+    $('#fr-go').disabled = sel.size === 0;
+  };
+  $('#fr-presets').addEventListener('click', e => {
+    const b = e.target.closest('[data-preset]'); if (!b) return;
+    sel.clear(); STARTER_FLOORS[b.dataset.preset].filter(x => equips.includes(x)).forEach(x => sel.add(x));
+    document.querySelectorAll('#fr-presets .chip').forEach(c => c.classList.toggle('on', c === b));
+    paint();
+  });
+  $('#fr-eq').addEventListener('click', e => {
+    const b = e.target.closest('[data-eq]'); if (!b) return;
+    sel.has(b.dataset.eq) ? sel.delete(b.dataset.eq) : sel.add(b.dataset.eq);
+    document.querySelectorAll('#fr-presets .chip').forEach(c => c.classList.remove('on'));
+    paint();
+  });
+  $('#fr-go').addEventListener('click', async () => {
+    const btn = $('#fr-go'), err = $('#fr-err');
+    btn.disabled = true; btn.textContent = 'Building your first week… (up to a minute)'; err.textContent = '';
+    try {
+      await saveGym([...sel]);
+      track('gym_profiled', { count: sel.size, firstRun: true });
+      const res = await pb.send('/api/ai/plan', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: $('#fr-goal').value.trim() || 'general strength',
+          days_per_week: Number($('#fr-days').value), experience: 'beginner', injuries: '', session_minutes: 45 }),
+      });
+      track('plan_generated', { workouts: (res.created || []).length, firstRun: true });
+      await loadWorkouts(true);
+      toast(`Your first week is ready — ${(res.created || []).length} workouts from your floor.`);
+      renderWorkouts();
+    } catch (e2) {
+      err.textContent = e2?.data?.message || e2?.message || 'Could not build the plan — try again.';
+      btn.disabled = false; btn.textContent = 'Build my first week';
+    }
+  });
 }
 
 /* ---------- signed-in dashboard (3D navigator) ---------- */

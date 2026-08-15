@@ -297,7 +297,7 @@ function bindPointer(el) {
       tiltTarget = Math.max(-0.22, Math.min(0.22, tiltTarget + dy * 0.004));
     } else if (e.pointerType === 'mouse' && performance.now() - lastHover > 30) {
       lastHover = performance.now();
-      setHover(pickAt(e.clientX, e.clientY));
+      setHover(pickAt(e.clientX, e.clientY), e.clientX, e.clientY);
     }
     kick();
   });
@@ -322,11 +322,28 @@ function bindPointer(el) {
   el.addEventListener('pointerleave', () => setHover(null));
 }
 
-function setHover(r) {
-  if (r === hovered) return;
+const REGION_LABEL = {
+  neck: 'neck', shoulders: 'shoulders', chest: 'chest', back: 'back', waist: 'waist / core',
+  upperArms: 'upper arms', lowerArms: 'lower arms', upperLegs: 'upper legs', lowerLegs: 'lower legs',
+};
+let tipEl = null, tipX = 0, tipY = 0;
+function setHover(r, clientX, clientY) {
+  if (clientX !== undefined) { tipX = clientX; tipY = clientY; }
+  if (r === hovered) { positionTip(); return; }
   hovered = r;
   renderer.domElement.style.cursor = r ? 'pointer' : 'grab';
   applyGlowTargets();
+  positionTip();
+}
+function positionTip() {
+  if (!mounted) return;
+  if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'avatar-tip'; }
+  if (tipEl.parentNode !== mounted.container) mounted.container.appendChild(tipEl);
+  if (!hovered) { tipEl.classList.remove('show'); return; }
+  const rect = mounted.container.getBoundingClientRect();
+  tipEl.textContent = REGION_LABEL[hovered] || hovered;
+  tipEl.style.transform = `translate(-50%,-140%) translate(${(tipX - rect.left).toFixed(0)}px,${(tipY - rect.top).toFixed(0)}px)`;
+  tipEl.classList.add('show');
 }
 
 export function setSelected(r) {
