@@ -315,6 +315,25 @@ footer .sep{opacity:.5}
 }
 @media (prefers-reduced-motion:reduce){.bm-shimmer{animation:none}}
 
+/* auth extras: Google button + separator + terms note */
+.oauth-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:10px 14px;font-size:14.5px;font-weight:600;margin-top:18px;
+}
+.oauth-btn svg{width:18px;height:18px;flex:none}
+.or-sep{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;margin:14px 0 2px}
+.or-sep::before,.or-sep::after{content:'';flex:1;height:1px;background:var(--line)}
+.legal-note{margin-top:16px;font-size:12px;color:var(--muted);line-height:1.5}
+.legal-note a{color:var(--muted);text-decoration:underline}
+.legal-note a:hover{color:var(--accent)}
+
+/* legal pages */
+.legal{max-width:680px;margin:0 auto}
+.legal h2{font-size:16px;margin:26px 0 8px;letter-spacing:-.01em}
+.legal p{color:#c9d1de;font-size:14.5px;line-height:1.65;margin-bottom:10px}
+.legal p b{color:var(--text)}
+.legal .alt{margin-top:28px}
+
 /* signed-in dashboard */
 .dash{max-width:820px;margin:0 auto;text-align:center}
 .dash .eyebrow{margin-bottom:8px}

@@ -33,6 +33,7 @@ func main() {
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		ensureSchema(app) // self-heal: coach_name on services (+ backfill)
+		ensureOAuth(app)  // Google sign-in from app.env (GOOGLE_CLIENT_ID/SECRET)
 
 		// Phase 0 probe — proves custom routes work end to end. Phase 1 adds
 		// /api/ai/plan and /api/ai/progress alongside it.
