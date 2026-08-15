@@ -206,8 +206,10 @@ footer .sep{opacity:.5}
   .exhead{flex-direction:column}
   .exhead img{width:100%;height:auto;aspect-ratio:1;max-width:280px;margin:0 auto}
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-  /* modal → near-fullscreen sheet, comfortable padding, no clipped corners */
-  #overlay{padding:0;align-items:stretch}
+  /* modal → full-screen sheet. display:block (not flex+stretch): a stretched
+     flex child is pinned to viewport height, so content taller than one screen
+     overflowed past the modal's background and the page showed through. */
+  #overlay{padding:0;display:block}
   .modal{max-width:none;min-height:100%;border-radius:0;padding:20px var(--pad) 40px}
   .modal h2{font-size:18px}
   .modal .close{top:12px;right:12px}

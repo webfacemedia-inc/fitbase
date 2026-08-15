@@ -345,7 +345,7 @@ async function renderLibrary() {
 
   view.innerHTML = `
     <h1>Exercise library</h1>
-    <p class="sub">${all.length} exercises · filter by muscle, equipment or target · media © Gym visual</p>
+    <p class="sub">${all.length} exercises · filter by muscle, equipment or target</p>
     <div class="lib-head" id="lib-head">
       <div class="bodymap-panel" id="bm-panel"><div class="bm-shimmer"></div></div>
       <div class="lib-controls">
