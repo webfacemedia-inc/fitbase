@@ -460,15 +460,25 @@ function initBodyMap() {
     });
     panel.classList.add('ready');
   };
-  if (matchMedia('(max-width:640px)').matches) {
-    $('#bm-toggle').addEventListener('click', () => {
-      const open = panel.classList.toggle('open');
-      if (open) mountIt().catch(() => $('#lib-head')?.classList.add('no3d'));
-    });
-  } else {
+  // Open by default everywhere — a hidden centerpiece is a centerpiece nobody
+  // discovers on a phone. On mobile the toggle collapses it (a real choice, not
+  // the default), and the last choice is remembered.
+  const mobile = matchMedia('(max-width:640px)').matches;
+  const hidden = mobile && localStorage.getItem('fb_bodymap') === 'hidden';
+  const toggle = $('#bm-toggle');
+  const paintToggle = (open) => { if (toggle) toggle.textContent = open ? '🧍 Hide body map' : '🧍 Show body map'; };
+  if (!hidden) {
+    panel.classList.add('open');
     (window.requestIdleCallback || setTimeout)(() =>
       mountIt().catch(() => $('#lib-head')?.classList.add('no3d')));
   }
+  paintToggle(!hidden);
+  toggle?.addEventListener('click', () => {
+    const open = panel.classList.toggle('open');
+    localStorage.setItem('fb_bodymap', open ? 'open' : 'hidden');
+    paintToggle(open);
+    if (open) mountIt().catch(() => $('#lib-head')?.classList.add('no3d'));
+  });
 }
 
 function paintBpChip() {
