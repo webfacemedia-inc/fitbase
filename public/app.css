@@ -418,3 +418,12 @@ footer .sep{opacity:.5}
   .home-hero .hero-sub{order:4} .home-hero .hero-cta{order:5} .home-hero .hero-note{order:6}
   .hero-avatar{height:min(58vh,460px)}
 }
+
+/* gym-owner demo banner */
+.demo-banner{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 18px;padding:12px 16px;
+  border:1px solid var(--accent-dim);border-radius:var(--radius);
+  background:linear-gradient(90deg,rgba(45,212,167,.12),rgba(45,212,167,.04));font-size:14px;color:#c9d1de;
+}
+.demo-banner .grow{flex:1;min-width:220px}
+.demo-banner b{color:var(--text)}

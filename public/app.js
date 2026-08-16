@@ -164,10 +164,29 @@ async function saveGym(equipment) {
   state.gym.equipment = equipment;
 }
 
+/* ---------- gym-owner demo mode ----------
+   #/demo (or #/library?demo=gym): a plausible commercial floor is loaded as an
+   in-memory gym profile — nothing persisted, no account — so a gym owner sees
+   exactly what a member sees: the body map + library filtered to that floor,
+   and a sample member's week. */
+const DEMO_FLOOR = ['barbell', 'dumbbell', 'cable', 'leverage machine', 'smith machine',
+  'body weight', 'kettlebell', 'ez barbell', 'stability ball', 'medicine ball', 'band'];
+function enterDemo() {
+  state.demo = true;
+  state.gym = { record: null, equipment: DEMO_FLOOR.slice(), demo: true };
+  state.ownedOnly = true;
+  track('demo_enter', {});
+}
+function renderDemo() {
+  enterDemo();
+  location.hash = '#/library?demo=gym';
+}
+
 /* ---------- router ---------- */
 
 const routes = {
   home: renderHome,
+  demo: renderDemo,
   library: renderLibrary,
   workouts: renderWorkouts,
   history: renderHistory,
@@ -383,11 +402,14 @@ async function renderLibrary() {
   }
   view.innerHTML = `<h1>Exercise library</h1>
     <p class="sub">Loading the catalog…</p>`;
+  if (params.get('demo') === 'gym' && !state.demo) enterDemo();
   const all = await loadCatalog();
-  if (me()) await loadGym();
+  if (me() && !state.demo) await loadGym();
   // The catalog fetch is slow on first load; if the user navigated to another
   // route while it was in flight, don't clobber that view with the library.
   if (document.body.dataset.route !== 'library') return;
+  // demo floor equipment names must match the catalog's vocabulary
+  if (state.demo) state.gym.equipment = state.gym.equipment.filter(e => all.some(x => x.equipment === e));
   const cats = [...new Set(all.map(x => x.category))].sort();
   const equips = [...new Set(all.map(x => x.equipment))].sort();
   const targets = [...new Set(all.map(x => x.target))].sort();
@@ -396,7 +418,13 @@ async function renderLibrary() {
     console.warn('unknown body_part filter:', state.bodyPart);
 
   view.innerHTML = `
-    <h1>Exercise library</h1>
+    ${state.demo ? `<div class="demo-banner">
+      <div class="grow"><b>Gym-owner demo.</b> You're seeing exactly what a member of a commercial gym sees —
+        a ${gymCount}-piece floor, and only the exercises it can actually do. Spin the body, tap a muscle.</div>
+      <button class="btn sm primary" onclick="openSampleWeek()">See a member's week</button>
+      <a class="btn sm" href="mailto:tommy@webfacemedia.com?subject=FitBase%20for%20my%20gym">Talk to Tommy</a>
+    </div>` : ''}
+    <h1>${state.demo ? 'What your members would see' : 'Exercise library'}</h1>
     <p class="sub">${all.length} exercises · filter by muscle, equipment or target</p>
     <div class="lib-head" id="lib-head">
       <div class="bodymap-panel" id="bm-panel"><div class="bm-shimmer"></div></div>
@@ -412,8 +440,8 @@ async function renderLibrary() {
             <option value="">All targets</option>
             ${targets.map(x => `<option ${x===state.target?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('')}
           </select>
-          ${me() ? (gymCount
-            ? `<label class="mygym-toggle"><input type="checkbox" id="f-owned" ${state.ownedOnly?'checked':''}> Only my gym (${gymCount})</label>`
+          ${(me() || state.demo) ? (gymCount
+            ? `<label class="mygym-toggle"><input type="checkbox" id="f-owned" ${state.ownedOnly?'checked':''}> ${state.demo ? 'Only this gym\'s floor' : 'Only my gym'} (${gymCount})</label>`
             : `<a class="btn sm" href="#/gym">Set up My Gym →</a>`) : ''}
         </div>
         <div class="chips" id="f-cats">
@@ -1372,6 +1400,52 @@ function renderHome() {
   }).catch(() => {});
 }
 
+
+
+/* Sample member's week for the gym-owner demo — real catalog exercises picked
+   client-side from the demo floor (push / pull / legs). No AI call, no account. */
+const SAMPLE_WEEK = [
+  { label: 'Day 1 · Push', pick: [['pectorals', 2], ['delts', 1], ['triceps', 1]] },
+  { label: 'Day 2 · Pull', pick: [['lats', 2], ['upper back', 1], ['biceps', 1]] },
+  { label: 'Day 3 · Legs & core', pick: [['quads', 2], ['hamstrings', 1], ['glutes', 1], ['abs', 1]] },
+];
+// classics first — a gym owner should recognise the movements, not read "assisted (kneeling)"
+const CLASSIC = /bench press|incline|overhead press|shoulder press|lateral raise|pushdown|dip|pull-?up|lat pulldown|row|deadlift|curl|squat|leg press|lunge|hip thrust|romanian|leg curl|plank|crunch|cable/i;
+const AVOID = /assisted|kneeling|band |suspension|isometric|wall|partner|self assisted/i;
+function openSampleWeek() {
+  const floor = new Set(state.gym?.equipment || []);
+  const pool = (state.catalog || []).filter(x => floor.has(x.equipment));
+  const byTarget = t => pool.filter(x => (x.target || '').toLowerCase() === t);
+  const days = SAMPLE_WEEK.map(d => {
+    const items = [];
+    for (const [target, n] of d.pick) {
+      const c = byTarget(target).sort((a, b) =>
+        (CLASSIC.test(b.name) - CLASSIC.test(a.name)) || (AVOID.test(a.name) - AVOID.test(b.name)) || a.name.localeCompare(b.name));
+      // spread across equipment so a day isn't five cable moves
+      const seen = new Set();
+      for (const x of c) { if (items.length >= 7) break; if (seen.has(x.equipment) && c.length > n) continue; seen.add(x.equipment); items.push(x); if (items.filter(i => i.target === x.target).length >= n) break; }
+    }
+    return { ...d, items };
+  });
+  track('demo_sample_week', {});
+  modal(`
+    <h2 style="text-transform:none">A member's week — built from this floor</h2>
+    <p class="sub" style="margin:6px 0 14px">This is the shape of what the AI coach hands a member: real exercises from the equipment on the floor,
+      sets × reps, animated demos, and it adjusts as they log. Every gym's plans come out of its own floor.</p>
+    ${days.map(d => `
+      <h2 style="font-size:15px;text-transform:none;margin:14px 0 8px">${esc(d.label)}</h2>
+      <div class="ilist" style="margin-top:0">
+        ${d.items.map(x => `<div class="itemrow" onclick="closeModal();openDetail('${esc(x.id)}')" style="cursor:pointer">
+          <img loading="lazy" src="${CDN}${esc(x.image)}" alt="">
+          <div class="grow"><div class="nm">${esc(x.name)}</div><div class="mt">${esc(x.target)} · ${esc(x.equipment)}</div></div>
+          <span class="count" style="margin:0;white-space:nowrap">3 × 10</span>
+        </div>`).join('') || '<p class="empty">—</p>'}
+      </div>`).join('')}
+    <div class="rowbar" style="max-width:none;margin:22px 0 0;flex-wrap:wrap">
+      <a class="btn primary" href="#/signin" onclick="closeModal()">Build this from your own floor — free</a>
+      <a class="btn" href="mailto:tommy@webfacemedia.com?subject=Branded%20FitBase%20for%20my%20gym">Ask about a branded setup</a>
+    </div>`);
+}
 
 /* ---------- first run: instant plan in 30 seconds ---------- */
 
