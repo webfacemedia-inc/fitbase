@@ -21,6 +21,16 @@ import (
 	"webface.cloud/platform/pbbrand"
 )
 
+// cleanRoutes maps short public paths to their SPA hash routes.
+var cleanRoutes = map[string]string{
+	"/demo":    "/#/demo",
+	"/library": "/#/library",
+	"/signin":  "/#/signin",
+	"/signup":  "/#/signin",
+	"/coaches": "/#/coaches",
+	"/app":     "/#/workouts",
+}
+
 func main() {
 	app := pocketbase.New()
 
@@ -80,6 +90,11 @@ func main() {
 			// extensionless SPA/legal routes) must always revalidate; versioned
 			// vendor files are immutable; other assets are ?v=-busted per deploy.
 			p := e.Request.URL.Path
+			// Clean, shareable URLs for links that go in emails and messages — a
+			// hash route is not something you paste into a note to a gym owner.
+			if dest, ok := cleanRoutes[strings.TrimSuffix(p, "/")]; ok && p != "/" {
+				return e.Redirect(302, dest)
+			}
 			h := e.Response.Header()
 			switch {
 			case strings.HasPrefix(p, "/vendor/"):
