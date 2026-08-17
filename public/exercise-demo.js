@@ -177,6 +177,14 @@ function placeProps(asset, prop) {
       model.worldToLocal(_dir);
       _dir.subVectors(_m, _dir).normalize();        // elbows → hands
     } else _dir.set(0, -1, 0);
+    // at the rest phase the mimed hands drop to the hips, putting their
+    // midpoint inside the pelvis — keep the bell in front of the hip line
+    // (X Bot faces +z in model space; the swing arc is already well past this)
+    const hips = bones.mixamorigHips;
+    if (hips) {
+      hips.getWorldPosition(_t); model.worldToLocal(_t);
+      _m.z = Math.max(_m.z, _t.z + 20);
+    }
     props.kettlebell.position.copy(_m);
     props.kettlebell.quaternion.setFromUnitVectors(_t.set(0, -1, 0), _dir);
   } else if (prop === 'dumbbell') {
@@ -217,6 +225,9 @@ export async function mount(container, clipName) {
   renderer.toneMappingExposure = 1.15;
   renderer.domElement.className = 'exdemo-canvas';
   renderer.domElement.style.display = 'block';
+  // horizontal drags rotate the figure, vertical swipes still scroll (body-map feel)
+  renderer.domElement.style.touchAction = 'pan-y';
+  renderer.domElement.style.cursor = 'grab';
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(33, 1, 0.1, 30);
@@ -261,7 +272,11 @@ export async function mount(container, clipName) {
   asset.mixer.clipAction(asset.clips[clipName]).reset().setLoop(THREE.LoopRepeat, Infinity).play();
   asset.mixer.update(0);                    // pose frame 0 before first paint
 
-  const st = active = { renderer, scene, camera, ro: null, raf: 0, last: 0, clipName, prop };
+  const st = active = {
+    renderer, scene, camera, ro: null, raf: 0, last: 0, clipName, prop,
+    rotTarget: 0.5, dragging: false, lastX: 0,
+    lastInteraction: performance.now() - 3000,   // start the turntable immediately
+  };
 
   const frame = (now) => {
     if (active !== st) return;
@@ -271,12 +286,40 @@ export async function mount(container, clipName) {
     st.last = now;
     asset.mixer.update(dt);
     if (prop) placeProps(asset, prop);
-    if (!reduceMotion.matches) asset.group.rotation.y += TURN_SPEED * dt;
+    // turntable idles back in a few seconds after the user lets go of a drag
+    if (!reduceMotion.matches && !st.dragging && now - st.lastInteraction > 3000)
+      st.rotTarget += TURN_SPEED * dt;
+    asset.group.rotation.y +=
+      (st.rotTarget - asset.group.rotation.y) * (reduceMotion.matches ? 1 : 0.12);
     renderer.render(scene, camera);
   };
   const kick = () => { if (active === st && !st.raf) { st.last = 0; st.raf = requestAnimationFrame(frame); } };
   st.onVis = () => { if (!document.hidden) kick(); };
   document.addEventListener('visibilitychange', st.onVis);
+
+  // drag to rotate, exactly like the body map
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', e => {
+    el.setPointerCapture(e.pointerId);
+    st.dragging = true; st.lastX = e.clientX;
+    st.lastInteraction = performance.now();
+    el.style.cursor = 'grabbing';
+    kick();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!st.dragging) return;
+    st.rotTarget += (e.clientX - st.lastX) * 0.011;
+    st.lastX = e.clientX;
+    st.lastInteraction = performance.now();
+    kick();
+  });
+  const endDrag = () => {
+    st.dragging = false;
+    st.lastInteraction = performance.now();
+    el.style.cursor = 'grab';
+  };
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
 
   const resize = () => {
     const w = container.clientWidth, h = container.clientHeight;
