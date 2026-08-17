@@ -17,6 +17,44 @@ const ASSET_V = (() => {
 })();
 let avatarModP = null, avatarMod = null;
 const loadAvatar = () => (avatarModP ||= import(`./avatar.js?v=${ASSET_V}`).then(m => (avatarMod = m)));
+
+/* 3D exercise demos — a second lazy island (exercise-demo.js + one GLB of
+   Mixamo clips, built by scripts/mixamo-to-glb.mjs). Fetched only when the
+   detail modal opens on a mapped exercise; never at boot. */
+let demoModP = null;
+const loadDemo = () => (demoModP ||= import(`./exercise-demo.js?v=${ASSET_V}`));
+/* exercise → clip in vendor/exercise-demos-1.glb. First match wins, so the
+   specific rules sit above the generic ones (overhead squat before barbell
+   squat, plyo push before push-up). bw/eq gates keep the mime honest: a
+   barbell squat never gets the bodyweight air-squat, a one-arm kettlebell
+   move never gets the two-hand barbell clip. Verified against the live
+   catalog 2026-08-17: 20/20 clips hit, 171 exercises mapped. */
+const DEMO_RULES = [
+  { clip: 'overhead-squat',   re: /overhead squat/i },
+  { clip: 'jumping-jacks',    re: /jack jump|astride jump/i, bw: true },
+  { clip: 'jump-push-up',     re: /(clap|plyo).*push|push.*clap/i },
+  { clip: 'push-up',          re: /push-?up/i, bw: true },
+  { clip: 'air-squat',        re: /\bsquat\b/i, bw: true },
+  { clip: 'back-squat',       re: /squat/i, eq: 'barbell' },
+  { clip: 'bicep-curl',       re: /^(?!.*(preacher|concentration|incline|seated|lying|prone|spider|over bench|wrist)).*biceps? curl|^(?!.*(preacher|seated|incline)).*hammer curl/i, eq: 'dumbbell' },
+  { clip: 'bicycle-crunch',   re: /air bike|bicycle/i },
+  { clip: 'box-jump',         re: /box jump/i },
+  { clip: 'burpee',           re: /burpee/i },
+  { clip: 'circle-crunch',    re: /\bcrunch\b/i, bw: true },
+  { clip: 'clean-and-jerk',   re: /clean and (jerk|press)|power clean/i, eq: 'barbell' },
+  { clip: 'front-raises',     re: /front raise/i, eq: 'dumbbell' },
+  { clip: 'kettlebell-swing', re: /swing/i, eq: 'kettlebell' },
+  { clip: 'pike-walk',        re: /inchworm|walk ?out/i },
+  { clip: 'plank',            re: /^(?!.*side).*\bplank\b/i, bw: true },
+  { clip: 'quick-steps',      re: /\brun\b|high knee against|walking high knee(?!s lunge)/i, bw: true },
+  { clip: 'situps',           re: /sit-?up/i, bw: true },
+  { clip: 'snatch',           re: /snatch/i, eq: 'barbell' },
+  { clip: 'sumo-high-pull',   re: /high pull|upright row/i },
+];
+const demoClipFor = x => DEMO_RULES.find(r =>
+  r.re.test(x.name) &&
+  (!r.bw || x.equipment === 'body weight') &&
+  (!r.eq || x.equipment === r.eq))?.clip || null;
 // avatar region → exercises.body_part (verified against the live catalog).
 // 'cardio' is the one body_part with no body region — chips/search cover it.
 const BP_MAP = {
@@ -63,11 +101,19 @@ function toast(msg) {
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.add('hidden'), 2600);
 }
 
+/* live 3D demo teardown — set by openDetail, must run on EVERY path that
+   destroys or replaces the modal DOM (closeModal, click-away, another modal
+   overwriting overlay.innerHTML, the language selector re-rendering) */
+let exDemoStop = null;
 function modal(html) {
+  exDemoStop?.(); exDemoStop = null;
   overlay.innerHTML = `<div class="modal">${html}<button class="close" onclick="closeModal()">✕</button></div>`;
   overlay.classList.remove('hidden');
 }
-function closeModal() { overlay.classList.add('hidden'); overlay.innerHTML = ''; }
+function closeModal() {
+  exDemoStop?.(); exDemoStop = null;
+  overlay.classList.add('hidden'); overlay.innerHTML = '';
+}
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
 const me = () => pb.authStore.isValid ? pb.authStore.record : null;
@@ -618,6 +664,7 @@ function paintGrid() {
   $('#f-grid').innerHTML = slice.map(x => `
     <div class="card" onclick="openDetail('${esc(x.id)}')" data-gif="${esc(x.gif_url || '')}">
       <img loading="lazy" src="${CDN}${esc(x.image)}" data-still="${CDN}${esc(x.image)}" alt="${esc(x.name)}">
+      ${demoClipFor(x) ? '<span class="badge3d">3D</span>' : ''}
       <div class="cb">
         <div class="nm">${esc(x.name)}</div>
         <div class="mt">${esc(x.target)} · ${esc(x.equipment)}</div>
@@ -638,10 +685,15 @@ async function openDetail(id, lang) {
   }
   const steps = (x.steps && x.steps[lang]) || x.steps?.en || [];
   const secondary = Array.isArray(x.secondary_muscles) ? x.secondary_muscles.join(', ') : '';
+  const clip = demoClipFor(x);
+  // unmapped exercises emit the exact pre-3D markup — the GIF, untouched
+  const media = clip
+    ? `<div class="exmedia" id="ex-demo"><img src="${CDN}${esc(x.gif_url)}" alt="${esc(x.name)} animation"></div>`
+    : `<img src="${CDN}${esc(x.gif_url)}" alt="${esc(x.name)} animation">`;
   modal(`
     <h2>${esc(x.name)}</h2>
     <div class="exhead">
-      <img src="${CDN}${esc(x.gif_url)}" alt="${esc(x.name)} animation">
+      ${media}
       <div>
         <div class="tags">
           <span class="tag">target <b>${esc(x.target)}</b></span>
@@ -664,6 +716,29 @@ async function openDetail(id, lang) {
     </div>
     <ol class="steps">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
     <p class="attr">${esc(x.attribution || '© Gym visual — https://gymvisual.com/')}</p>`);
+
+  // 3D demo mounts after the modal paints; the GIF is the loading state and
+  // the fallback for every failure path (no WebGL, fetch error, modal closed)
+  if (clip) (async () => {
+    try {
+      const m = await loadDemo();
+      const host = $('#ex-demo');
+      if (!host || !host.isConnected || !m.isSupported()) return;
+      if (!(await m.mount(host, clip))) return;
+      if (!host.isConnected) { m.unmount(); return; }   // closed during load
+      host.classList.add('live');
+      const chip = document.createElement('button');
+      chip.className = 'demo-toggle';
+      chip.textContent = 'GIF';
+      chip.onclick = () => {
+        const live = host.classList.toggle('live');
+        chip.textContent = live ? 'GIF' : '3D';
+        if (live) m.mount(host, clip); else m.unmount();
+      };
+      host.appendChild(chip);
+      exDemoStop = () => m.unmount();
+    } catch { /* GIF stays */ }
+  })();
 }
 
 /* ---------- workouts ---------- */

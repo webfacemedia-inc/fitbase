@@ -82,7 +82,12 @@ h2{font-size:16px;margin-bottom:10px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
 .card{
   background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-  overflow:hidden;cursor:pointer;transition:border-color .15s;
+  overflow:hidden;cursor:pointer;transition:border-color .15s;position:relative;
+}
+.card .badge3d{
+  position:absolute;top:8px;right:8px;background:rgba(10,14,20,.72);
+  border:1px solid var(--accent-dim);border-radius:6px;padding:2px 7px;
+  font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--accent);
 }
 .card:hover{border-color:var(--accent-dim)}
 .card img{width:100%;aspect-ratio:1;object-fit:cover;background:#fff;display:block}
@@ -104,6 +109,18 @@ h2{font-size:16px;margin-bottom:10px}
 .modal h2{font-size:19px;text-transform:capitalize;padding-right:40px}
 .exhead{display:flex;gap:20px;margin:16px 0}
 .exhead img{width:220px;height:220px;border-radius:12px;background:#fff;flex-shrink:0}
+/* 3D exercise demo: canvas overlays the GIF slot; the img is the loading
+   state and the fallback, hidden (not removed) while the demo is live */
+.exmedia{position:relative;width:220px;height:220px;flex-shrink:0}
+.exmedia img{width:100%;height:100%}
+.exmedia canvas{position:absolute;inset:0;width:100%!important;height:100%!important;border-radius:12px;background:var(--panel2)}
+.exmedia.live img{visibility:hidden}
+.demo-toggle{
+  position:absolute;right:8px;bottom:8px;z-index:2;
+  background:rgba(10,14,20,.72);border:1px solid var(--line);border-radius:6px;
+  padding:3px 9px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;
+}
+.demo-toggle:hover{color:var(--text);border-color:var(--accent-dim)}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .tag{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;color:var(--muted);text-transform:capitalize}
 .tag b{color:var(--text);font-weight:600}
@@ -208,6 +225,7 @@ footer .sep{opacity:.5}
   h1{font-size:20px}
   .exhead{flex-direction:column}
   .exhead img{width:100%;height:auto;aspect-ratio:1;max-width:280px;margin:0 auto}
+  .exmedia{width:100%;height:auto;aspect-ratio:1;max-width:280px;margin:0 auto}
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
   /* modal → full-screen sheet. display:block (not flex+stretch): a stretched
      flex child is pinned to viewport height, so content taller than one screen

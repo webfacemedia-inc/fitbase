@@ -1,0 +1,11 @@
+{
+  "name": "fitbase-scripts",
+  "private": true,
+  "description": "Deps for the offline asset-prep scripts only (the app itself is buildless). npm i here, then: node mixamo-to-glb.mjs ../assets/mixamo ../public/vendor/exercise-demos-1.glb",
+  "devDependencies": {
+    "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/functions": "^4.2.1",
+    "meshoptimizer": "^0.24.0",
+    "three": "^0.185.0"
+  }
+}

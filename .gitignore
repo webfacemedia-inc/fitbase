@@ -1,1 +1,5 @@
 .claude/settings.local.json
+# Mixamo raw downloads: usable in the product, NOT redistributable — never push
+assets/mixamo/*.fbx
+node_modules/
+.DS_Store
